@@ -93,12 +93,13 @@ python module _glmnet ! in
             integer optional,check(len(f)>=n),depend(f) :: n=len(f)
             real*8 dimension(n) :: f
         end subroutine cmodval
+
         subroutine lognet(parm,no,ni,nc,x,y,jd,vp,ne,nx,nlam,flmin,ulam,thr,isd,maxit,kopt,lmu,a0,ca,ia,nin,dev,alm,nlp,jerr) ! in :glmnet:glmnet.f
             real*8 :: parm
             integer intent(hide),check(shape(x,0)==no),depend(x) :: no=shape(x,0)
             integer intent(hide),check(shape(x,1)==ni),depend(x) :: ni=shape(x,1)
-            integer optional,check(shape(y,0)==max(2,nc)),depend(y) :: nc = ((shape(y,0) == 2) ? 1 : shape(y, 0))
-            real*8 dimension(no,ni) :: x
+            integer check(shape(y,1)==max(2,nc)),depend(y) :: nc            
+	    real*8 dimension(no,ni) :: x
             real*8 dimension(no,max(2,nc)),depend(no) :: y
             integer dimension(*) :: jd
             real*8 dimension(ni),depend(ni) :: vp
@@ -109,11 +110,13 @@ python module _glmnet ! in
             real*8 dimension(nlam) :: ulam
             real*8 :: thr
             integer optional :: isd=1 ! Standardize predictors by default
-            integer :: maxit
+            integer optional :: maxit=100
             integer optional :: kopt=1 ! Use modified Newton-Raphson by default
+
+            ! Outputs
             integer intent(out) :: lmu
-            real*8 intent(out),dimension(nc,nlam),depend(nlam) :: a0
-            real*8 intent(out),dimension(nx,nc,nlam),depend(nlam) :: ca
+            real*8 intent(out),dimension(nc,nlam),depend(nlam,nc) :: a0
+            real*8 intent(out),dimension(nx,nc,nlam),depend(nlam,nc) :: ca
             integer intent(out),dimension(nx),depend(nx) :: ia
             integer intent(out),dimension(nlam),depend(nlam) :: nin
             real*8 intent(out),dimension(nlam),depend(nlam) :: dev
