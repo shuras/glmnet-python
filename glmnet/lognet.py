@@ -118,7 +118,7 @@ class LogNet(GlmNet):
             self.y_level_count = np.array([y_level_count])
         # Setup is complete, call the wrapper
         (self._out_n_lambdas,
-        self.intercepts,
+        self._intercepts,
         self._comp_coef,
         self._p_comp_coef,
         self._n_comp_coef,
@@ -137,6 +137,10 @@ class LogNet(GlmNet):
                                            self.thresh, 
                                            nlam=self.n_lambdas
                             )
+        # Keep some model metadata
+        self._n_fit_obs, self._n_fit_params = X.shape
+        # The indexes into the predictor array are off by one due to fortran
+        # convention, fix it up.
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
         # Check for errors, documented in glmnet.f.
         if self._error_flag != 0:
@@ -148,6 +152,26 @@ class LogNet(GlmNet):
                 raise MemoryError('elnet() returned error code %d' % jerr)
             else:
                 raise Exception('unknown error: %d' % jerr)
+
+    def __str__(self):
+        s = ("A logistic net model fit on %d observations and %d parameters.\n"
+             "The model was fit in %d passes over the data.                 \n"
+             "There were %d values of lambda resulting in non-zero models.  \n"
+             "There were %d non-zero coefficients in the largest model.     \n")
+        return s % (self._n_fit_obs, self._n_fit_params,
+                        self._n_passes,
+                        self._out_n_lambdas,
+                        np.max(self._n_comp_coef)
+               )
+
+    @property
+    def intercepts(self):
+        '''The fit model intercepts.
+
+          A _n_comp_coef * _out_n_lambdas array containing the fit model
+        coefficients for each value of lambda.
+        '''
+        return self._intercepts[:self._out_n_lambdas]
 
     @property
     def coefficients(self):
@@ -178,11 +202,10 @@ class LogNet(GlmNet):
 
     def _predict_lp(self, X):
         '''Return model predictions on a linear predictor scale.'''
-        return np.dot(X[:, self._indicies],
-                      self.coefficients
-        )
+        return self.intercepts + np.dot(X[:, self._indicies],
+                                        self.coefficients
+                                 )
 
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
-        return 1 / ( 1 + np.exp(self.intercepts + self._predict_lp(X) ) )
-
+        return 1 / ( 1 + np.exp(self._predict_lp(X)) )
