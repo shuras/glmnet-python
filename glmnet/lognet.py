@@ -5,8 +5,37 @@ import _glmnet
 from glmnet import GlmNet
 
 class LogNet(GlmNet):
+    '''The logistic net: a multivariate logistic model with both L1 and L2
+    regularizers.
+
+      This class implements the logistic net class of predictive models. These
+    models combine the classical ridge and lasso regularizers into a combined
+    penalty.  More specifically, the loss function minimized by this model is:
+
+        L(\beta_0, \beta_1, ..., \beta_n) =
+            BinDev(\beta_0, \beta_1, ..., \beta_n; X, y) + 
+            \lambda * ( (\alpha - 1)/2 * | \beta |_2 + \alpha * | \beta |_1 )
+
+    where BinDev is the usual binomial deviance:
+
+      BinDev(\beta_0, \beta_1, ..., \beta_n; X, y) =
+       -2*sum( y*log(1 - p) + (1 - y)*log(1 - p) )
+
+    where p is formed by applying the usual logistic function to a linear
+    predictor.
+    '''
 
     def __init__(self, max_iterations=10, opt_type=1, **kwargs):
+        '''LogNet accepts the following two configuration parameters on
+        configuration.
+
+          * max_iterations: The maximum number of descent iterations to perform
+            for each value of lambda.
+          * opt_type: The optimization pocedure used to fit each model.
+              0: Newton-Ralphson
+              1: Modified Newrons.  This is recommended in the fortran
+              documentation.
+        '''
         GlmNet.__init__(self, **kwargs)
         # The maximum number of iterations to preform for a single lambda
         self._max_iterations = np.array([max_iterations])
@@ -14,7 +43,52 @@ class LogNet(GlmNet):
         self._opt_type = np.array([opt_type])
 
     def _fit(self, X, y):
-        # Predictors and response
+        '''Fit a logistic or multinomial net model.
+
+        Arguments:
+
+          * X: The predictors.  A n_obs * n_preds array.
+
+          * y: The response.  This method accepts the predictors in two
+            differnt configurations:
+
+            - An n_obs * n_classes array.  In this case, each column in y must
+              be a boolean flag indicating whether the observation is or is not
+              of this class.
+            - An n_obs array.  In this case the array must contain a discrete
+              number of values, and is converted into the previous form before
+              being passed to the model.
+
+        After fitting, the following attributes are set:
+        
+        Private attributes:
+
+          * _out_n_lambdas: The number of fit lambdas associated with non-zero
+            models; for large enough lambdas the models will become zero in the
+            presense of an L1 regularizer.
+          * _comp_coef: The fit coefficients in a compressed form.  Only
+            coefficients that are non-zero for some lambda are reported, and the
+            associated between these parameters and the predictors are given by
+            the _p_comp_coef attribute.
+          * _p_comp_coef: An array associating the coefficients in _comp_coef to
+            columns in the predictor array. 
+          * _indicies: The same information as _p_comp_coef, but zero indexed to
+            be compatable with numpy arrays.
+          * _n_comp_coef: The number of coefficients that are non-zero for some
+            value of lambda.
+          * _n_passes: The total number of passes over the data used to fit the
+            model.
+          * _error_flag: Error flag from the fortran code.
+
+        Public Attributes:
+
+          * intecepts: An array of langth _out_n_labdas.  The intercept for
+            each model.
+          * r_sqs: An array of length _out_n_lambdas containing the r-squared
+            statistic for each model.
+          * out_lambdas: An array containing the lambda values associated with
+            each fit model.
+        '''
         X = np.asanyarray(X)
         # Fortran expects an n_obs * n_classes array.  If a one dimensional
         # array is passed, we construct an appropriate widening. 
@@ -64,7 +138,6 @@ class LogNet(GlmNet):
                                            nlam=self.n_lambdas
                             )
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
-
         # Check for errors, documented in glmnet.f.
         if self._error_flag != 0:
             if self._error_flag == 10000:
@@ -78,10 +151,24 @@ class LogNet(GlmNet):
 
     @property
     def coefficients(self):
+        '''The fit model coefficients for each lambda.
+ 
+          The dimensions of this array depend on whether of not a two class
+        response was used (i.e. was logistic regression performed):
+
+          * If so: A _n_comp_coef * _out_n_lambdas array containing the fit 
+            model coefficients for each value of lambda.
+
+          * If not: A _n_comp_coef * n_classes * _out_n_lambdas array containing
+            the model coefficients for each level of the response, for each
+            lambda.
+        '''
         if self.logistic:
             return self._logistic_coef()
         else:
-            return self._non_logistic_coef()
+            raise NotImplementedError("Only two class regression is currently "
+                                      "implemented."
+                  )
 
     def _logistic_coef(self):
         ccsq = np.squeeze(self._comp_coef)
@@ -90,10 +177,12 @@ class LogNet(GlmNet):
                 ]
 
     def _predict_lp(self, X):
+        '''Return model predictions on a linear predictor scale.'''
         return np.dot(X[:, self._indicies],
                       self.coefficients
         )
 
     def predict(self, X):
+        '''Return model predictions on the probability scale.'''
         return 1 / ( 1 + np.exp(self.intercepts + self._predict_lp(X) ) )
 

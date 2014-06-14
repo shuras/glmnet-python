@@ -4,7 +4,32 @@ from glmnet_config import (_DEFAULT_THRESH,
                            _DEFAULT_NLAM)
 
 class GlmNet(object):
+    '''Parent class for glmnet model objects.
+    
+      Glmnets are a class of predictive models. They are a regularized version
+    generalized linear models that combines the ridge (L^2) and lasso (L^1)
+    penalties.  The general form of the loss function being optimized is:
 
+        L(\beta_0, \beta_1, ..., \beta_n) =
+            Dev(\beta_0, \beta_1, ..., \beta_n) + 
+            \lambda * ( (\alpha - 1)/2 * | \beta |_2 + \alpha * | \beta |_1 )
+
+    where Dev is the deviance of the classical glm, |x|_2 and |x|_1 are the L^2
+    and L^1 norms, and \lambda and \alpha are tuning parameters:
+
+      * \lambda controlls the overall ammount of regularization, and is usually
+        tuned by cross validation.
+
+      * \alpha controlls the balance between the L^1 and L^2 regularizers. In
+        the extreme cases: \alpha = 0 : Ridge Regression
+                           \alpha = 0 : Lasso Regression
+
+    All glmnet object accept a value of \alpha at instantiation time.  Glmnet
+    defaults to fitting a full path of \lambda values, from \lambda_max (all
+    parameters zero) to 0 (an unregularized model).  The user may also choose to
+    supply a list of alphas, in this case the default behavior is overriden and
+    a glmnet is fit for each value of lambda the user supplies.
+    '''
     def __init__(self, 
                  alpha, 
                  lambdas=None,
@@ -20,7 +45,36 @@ class GlmNet(object):
                  overwrite_pred_ok=False,
                  overwrite_targ_ok=False
         ):
-        '''Configure the glmnet.'''
+        '''Create a glmnet object and implement configuration common to all
+        subclasses.  Accepts the following arguments:
+
+          * alpha: Relative weighting between the L1 and L2 regularizers. 
+          * lambdas: Optional user specified list of the lambda parameters.
+          * weights: Optional relative weights for observations when fitting the
+              model, only available for some models.
+          * rel_penalties: Relative penalty weights for the covariates.  A value
+            of zero indicates an unpenalized parameter, 1 a fully penalized
+            parameter.
+          * excl_preds: Predictors to exclude from consideration in the model.
+            To exclude varaibles pass an array with 1 as the first entry, then a
+            1 in the i'th entry removes te i+1'st parameter from model fitting.
+          * standardize: Boolean flag, do we standardize the predictor
+            variables.  Defaults to true, which is important for the regularizer
+            to be fair.  Note that the output parameters are allways reported on
+            the scale of the origional predictors.
+          * max_vars_all: Bound to inforce on the number of variables in all
+            models.
+          * max_vars_largest: Bound on the number of variables that enter in the
+            largest model.
+          * threshold: Convergence threshold for each lambda.
+          * frac_lg_lambda: Control parameter for range of lambda values to
+          * search: \lambda_min = frac_lg_lambda *  (\lambda_max)   
+          * n_lambdas: The number of lambdas to fit in the search space.
+          * overwrite_pred_ok: Overwirte the memory holding the predictor when
+            standardizing.
+          * overwirte_targ_ok: Overwrite the memory holding the target when
+            standardizing.
+        '''
         # Relative weighting between L1 and L2 norm
         self.alpha = alpha
         # User supplied lambdas
@@ -49,7 +103,7 @@ class GlmNet(object):
         self.overwrite_targ_ok = overwrite_targ_ok 
 
     def _validate_inputs(self, X, y):
-
+        '''Validate and process the prectors and response for model fitting.'''
         X = np.asanyarray(X)
         # Decide on the largest allowable models
         self.max_vars_all = (
