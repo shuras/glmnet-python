@@ -210,6 +210,16 @@ class LogisticNet(GlmNet):
         '''Return model predictions on the probability scale.'''
         return 1 / ( 1 + np.exp(self._predict_lp(X)) )
 
+    def deviance(self, X, y):
+        '''Calculate the binomial deviance for every lambda.'''
+        y_hat = self.predict(X)
+        # Take the response y, and repeat it as a column to produce a matrix
+        # of the same dimensions as y_hat
+        y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
+        #print y_stacked
+        bin_dev = y_stacked*np.log(y_hat) + (1 - y_stacked)*np.log(1 - y_hat)
+        return np.apply_along_axis(np.sum, 0, -2*bin_dev)
+
     def _plot_path(self):
         '''Plot the full regularization path of all the non-zero model
         coefficients.

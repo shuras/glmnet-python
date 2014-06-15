@@ -140,10 +140,25 @@ class ElasticNet(GlmNet):
         return self._intercepts[:self._out_n_lambdas]
 
     def predict(self, X):
-        '''Produce model predictions from new data.'''
+        '''Produce model predictions from new data.
+        
+        Returns an n_obs * n_lambdas array, where n_obs is the number of rows
+        in X.
+        '''
         return self.intercepts + np.dot(X[:, self._indicies],
                                         self.coefficients
                                  )
+
+    def deviance(self, X, y):
+        '''Calculate the normal deviance (i.e. sum of squared errors) for
+        every lambda.'''
+        y_hat = self.predict(X)
+        # Take the response y, and repeat it as a column to produce a matrix
+        # of the same dimensions as y_hat
+        y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
+        #print y_stacked
+        sum_of_sq_residuals = (y_stacked - y_hat)**2
+        return np.apply_along_axis(np.sum, 0, sum_of_sq_residuals)
 
     def _plot_path(self):
         '''Plot the full regularization path of all the non-zero model
