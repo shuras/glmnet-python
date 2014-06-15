@@ -1,6 +1,6 @@
 import numpy as np
 from elastic_net import ElasticNet
-from lognet import LogNet
+from logistic_net import LogisticNet
 
 display_bar = '-'*70
 
@@ -39,7 +39,7 @@ w[20:] = 0
 p = 1 /( 1 + np.exp(-np.dot(X, w)) )
 y = np.float64(p > .5)
 
-lnet = LogNet(alpha=.75)
+lnet = LogisticNet(alpha=.75)
 lnet.fit(X, y)
 
 print lnet 

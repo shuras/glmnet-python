@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import _glmnet
 from glmnet import GlmNet
 
-class LogNet(GlmNet):
+class LogisticNet(GlmNet):
     '''The logistic net: a multivariate logistic model with both L1 and L2
     regularizers.
 
