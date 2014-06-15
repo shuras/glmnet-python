@@ -209,3 +209,18 @@ class LogNet(GlmNet):
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
         return 1 / ( 1 + np.exp(self._predict_lp(X)) )
+
+    def _plot_path(self):
+        '''Plot the full regularization path of all the non-zero model
+        coefficients.
+        '''
+        plt.clf()
+        fig, ax = plt.subplots()
+        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
+        for coef_path in self.coefficients:
+            ax.plot(xvals, coef_path[1:])
+        ax.set_title("Regularization paths for logistic net with alpha = %s" % 
+                     self.alpha)
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Parameter Value")
+        plt.show()

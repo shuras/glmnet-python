@@ -13,7 +13,7 @@ w = np.random.randn(40)
 w[20:] = 0
 y = np.dot(X, w)
 
-enet = ElasticNet(alpha=.1)
+enet = ElasticNet(alpha=1)
 enet.fit(X, y)
 
 print enet
@@ -26,6 +26,8 @@ preds = enet.predict(X)
 print y[:10]
 print preds[:10,np.shape(preds)[1]-1]
 
+# enet.plot_path()
+
 print
 print display_bar
 print "Fit a logistic net on some fake data."
@@ -37,7 +39,7 @@ w[20:] = 0
 p = 1 /( 1 + np.exp(-np.dot(X, w)) )
 y = np.float64(p > .5)
 
-lnet = LogNet(alpha=.1)
+lnet = LogNet(alpha=.75)
 lnet.fit(X, y)
 
 print lnet 
@@ -49,3 +51,5 @@ print display_bar
 preds = lnet.predict(X)
 print p[:10]
 print preds[:10,np.shape(preds)[1]-1]
+
+lnet.plot_path()

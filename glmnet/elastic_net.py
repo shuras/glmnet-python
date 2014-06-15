@@ -150,8 +150,13 @@ class ElasticNet(GlmNet):
         coefficients.
         '''
         plt.clf()
+        fig, ax = plt.subplots()
         xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
         for coef_path in self.coefficients:
-            plt.plot(xvals, coef_path[1:])
+            ax.plot(xvals, coef_path[1:])
+        ax.set_title("Regularization paths for elastic net with alpha = %s" % 
+                     self.alpha)
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Parameter Value")
         plt.show()
     
