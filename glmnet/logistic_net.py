@@ -154,24 +154,7 @@ class LogisticNet(GlmNet):
                 raise Exception('unknown error: %d' % jerr)
 
     def __str__(self):
-        s = ("A logistic net model fit on %d observations and %d parameters.\n"
-             "The model was fit in %d passes over the data.                 \n"
-             "There were %d values of lambda resulting in non-zero models.  \n"
-             "There were %d non-zero coefficients in the largest model.     \n")
-        return s % (self._n_fit_obs, self._n_fit_params,
-                        self._n_passes,
-                        self._out_n_lambdas,
-                        np.max(self._n_comp_coef)
-               )
-
-    @property
-    def intercepts(self):
-        '''The fit model intercepts.
-
-          A _n_comp_coef * _out_n_lambdas array containing the fit model
-        coefficients for each value of lambda.
-        '''
-        return self._intercepts[:self._out_n_lambdas]
+        return self._str('logistic')
 
     @property
     def coefficients(self):
@@ -200,12 +183,6 @@ class LogisticNet(GlmNet):
                     :self._out_n_lambdas
                 ]
 
-    def _predict_lp(self, X):
-        '''Return model predictions on a linear predictor scale.'''
-        return self.intercepts + np.dot(X[:, self._indicies],
-                                        self.coefficients
-                                 )
-
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
         return 1 / ( 1 + np.exp(self._predict_lp(X)) )
@@ -221,16 +198,4 @@ class LogisticNet(GlmNet):
         return np.apply_along_axis(np.sum, 0, -2*bin_dev)
 
     def _plot_path(self):
-        '''Plot the full regularization path of all the non-zero model
-        coefficients.
-        '''
-        plt.clf()
-        fig, ax = plt.subplots()
-        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
-        for coef_path in self.coefficients:
-            ax.plot(xvals, coef_path[1:])
-        ax.set_title("Regularization paths for logistic net with alpha = %s" % 
-                     self.alpha)
-        ax.set_xlabel("log(lambda)")
-        ax.set_ylabel("Parameter Value")
-        plt.show()
+        self._plot_path('logistic')

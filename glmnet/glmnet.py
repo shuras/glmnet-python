@@ -141,9 +141,52 @@ class GlmNet(object):
         else:
             self.lambdas = None
         
+    def _str(self, name):
+        s = ("A %s net model fit on %d observations and %d parameters.     \n"
+             "The model was fit in %d passes over the data.                \n"
+             "There were %d values of lambda resulting in non-zero models. \n"
+             "There were %d non-zero coefficients in the largest model.    \n")
+        return s % (name, 
+                    self._n_fit_obs, self._n_fit_params,
+                    self._n_passes,
+                    self._out_n_lambdas,
+                    np.max(self._n_comp_coef)
+               )
+
     def fit(self, X, y):
         self._validate_inputs(X, y)
         self._fit(X, y)
 
-    def plot_path(self):
-        self._plot_path()
+    @property
+    def intercepts(self):
+        '''The fit model intercepts.
+
+          A _n_comp_coef * _out_n_lambdas array containing the fit model
+        coefficients for each value of lambda.
+        '''
+        return self._intercepts[:self._out_n_lambdas]
+
+    def _predict_lp(self, X):
+        '''Return model predictions on a linear predictor scale.
+
+          Returns an n_obs * n_lambdas array, where n_obs is the number of rows
+        in X.
+        '''
+        return self.intercepts + np.dot(X[:, self._indicies],
+                                        self.coefficients
+                                 )
+
+    def _plot_path(self, name):
+        '''Plot the full regularization path of all the non-zero model
+        coefficients.
+        '''
+        plt.clf()
+        fig, ax = plt.subplots()
+        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
+        for coef_path in self.coefficients:
+            ax.plot(xvals, coef_path[1:])
+        ax.set_title("Regularization paths for %s net with alpha = %s" % 
+                     name, self.alpha)
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Parameter Value")
+        plt.show()
