@@ -134,7 +134,7 @@ class LogisticNet(GlmNet):
                                            self.max_vars_all, 
                                            self.frac_lg_lambda, 
                                            self.lambdas,
-                                           self.thresh, 
+                                           self.threshold, 
                                            nlam=self.n_lambdas
                             )
         # Keep some model metadata

@@ -93,7 +93,7 @@ class GlmNet(object):
         # largest model
         self.max_vars_largest = max_vars_largest
         # Minimum change in largest coefficient, stopping criterion
-        self.thresh = threshold 
+        self.threshold = threshold 
         # Fraction of largest lambda at which to stop
         self.frac_lg_lambda = _DEFAULT_FLMIN
         # Maximum number of lambdas to try
@@ -136,9 +136,9 @@ class GlmNet(object):
         self.rel_penalties = (np.ones(X.shape[1]) if self.rel_penalties is None
                                                   else self.rel_penalties
                              )
-        if self.rel_penalties.shape[0] != X.shape[0]:
+        if self.rel_penalties.shape[0] != X.shape[1]:
             raise ValueError("The relative penalties vector must have the "
-                             "same length as X."
+                             "same length as the number of columns in X."
                   )
         # If no explicit exclusion is supplied, pass a zero to exclude nothing
         self.excl_preds = (np.zeros(1) if self.excl_preds is None
@@ -146,7 +146,7 @@ class GlmNet(object):
                           )
         if self.excl_preds.shape[0] != 1:
             if self.excl_preds.shape[0] != X.shape[1]:
-                raise ValueError("Non null excluded predictors variable must "
+                raise ValueError("Non null excluded predictors array must "
                                  "have the same length as the number of "
                                  "columns in X."
                       )
@@ -171,7 +171,12 @@ class GlmNet(object):
                     np.max(self._n_comp_coef)
                )
 
+    def _clone(self):
+        '''Copy an unfit glmnet object.'''
+        return self.__class__(**self.__dict__)
+
     def fit(self, X, y):
+        '''Fit the model.'''
         self._validate_inputs(X, y)
         self._fit(X, y)
 

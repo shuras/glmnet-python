@@ -1,6 +1,5 @@
 import numpy as np
-from elastic_net import ElasticNet
-from logistic_net import LogisticNet
+from glmnet import ElasticNet, LogisticNet
 
 display_bar = '-'*70
 
@@ -8,7 +7,7 @@ print display_bar
 print "Fit an elastic net on some fake data"
 print display_bar
 
-X = np.random.randn(50000, 40)
+X = np.random.randn(5000, 40)
 w = np.random.randn(40)
 w[20:] = 0
 y = np.dot(X, w)
@@ -26,6 +25,8 @@ preds = enet.predict(X)
 print y[:10]
 print preds[:10,np.shape(preds)[1]-1]
 
+print
+print enet.deviance(X, y)
 # enet.plot_path()
 
 print
@@ -33,7 +34,7 @@ print display_bar
 print "Fit a logistic net on some fake data."
 print display_bar
 
-X = np.random.randn(50000, 40)
+X = np.random.randn(1000, 40)
 w = np.random.randn(40)
 w[20:] = 0
 p = 1 /( 1 + np.exp(-np.dot(X, w)) )
@@ -52,4 +53,7 @@ preds = lnet.predict(X)
 print p[:10]
 print preds[:10,np.shape(preds)[1]-1]
 
-lnet.plot_path()
+print 
+print lnet.deviance(X, y)
+#
+#lnet.plot_path()
