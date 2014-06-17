@@ -105,6 +105,10 @@ class GlmNet(object):
     def _validate_inputs(self, X, y):
         '''Validate and process the prectors and response for model fitting.'''
         X = np.asanyarray(X)
+        y = np.asanyarray(y)
+        # Check that the dimensions work out
+        if X.shape[0] != y.shape[0]:
+            raise ValueError("X and y must have the same length.")
         # Decide on the largest allowable models
         self.max_vars_all = (
             X.shape[1] if self.max_vars_all is None else self.max_vars_all
@@ -115,7 +119,7 @@ class GlmNet(object):
         )
         if self.max_vars_all < self.max_vars_largest:
             raise ValueError("Inconsistant parameters: need max_vars_all "
-                             "< max_vars_larges."
+                             "< max_vars_largest."
                   )
 
         # If no explicit weights are passed, each observation is given the same
@@ -123,15 +127,29 @@ class GlmNet(object):
         self.weights = (np.ones(X.shape[0]) if self.weights is None
                                             else self.weights
                        )
+        if self.weights.shape[0] != X.shape[0]:
+            raise ValueError("The weights vector must have the same length "
+                             "as X."
+                  )
         # If no explicit penalties are passed, each varaible is given the same
         # penalty
         self.rel_penalties = (np.ones(X.shape[1]) if self.rel_penalties is None
                                                   else self.rel_penalties
                              )
+        if self.rel_penalties.shape[0] != X.shape[0]:
+            raise ValueError("The relative penalties vector must have the "
+                             "same length as X."
+                  )
         # If no explicit exclusion is supplied, pass a zero to exclude nothing
         self.excl_preds = (np.zeros(1) if self.excl_preds is None
                                        else self.excl_preds
                           )
+        if self.excl_preds.shape[0] != 1:
+            if self.excl_preds.shape[0] != X.shape[1]:
+                raise ValueError("Non null excluded predictors variable must "
+                                 "have the same length as the number of "
+                                 "columns in X."
+                      )
         # User supplied list of lambdas
         if self.lambdas is not None:
             self.lambdas = np.asarray(self.lambdas)
