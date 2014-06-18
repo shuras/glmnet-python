@@ -12,7 +12,7 @@ print display_bar
 X = np.random.randn(5000, 40)
 w = np.random.randn(40)
 w[20:] = 0
-y = np.dot(X, w) + .2*np.random.randn(5000)
+y = np.dot(X, w) #+ .2*np.random.randn(5000)
 
 enet = ElasticNet(alpha=1)
 
@@ -22,5 +22,11 @@ enet = ElasticNet(alpha=1)
 
 #print _fit_and_score(CC, X, y, range(0, 5000, 2), range(1, 5000, 2))
 
-enet_cv = CVGlmNet(enet, n_jobs=3)
+enet_cv = CVGlmNet(enet, n_jobs=1)
 enet_cv.fit(X, y)
+
+
+print enet_cv.predict(X)
+
+print enet_cv.coefficients
+print enet_cv.intercepts
