@@ -21,13 +21,34 @@ class ElasticNet(GlmNet):
       RSS(\beta_0, \beta_1, ..., \beta_n; X, y) = sum( (\beta * X_i - y_i)^2 )
     '''
 
-    def _fit(self, X, y):
+    def fit(self, X, y,
+            lambdas=None, weights=None, rel_penalties=None,
+            excl_preds=None, box_constraints=None):
         '''Fit an elastic net model.
 
         Arguments: 
 
           * X: The predictors.  A n_obs * n_preds array.
           * y: The response.  A n_obs array.
+
+        Optional Arguments:
+          
+          * lambdas: A user supplied list of lambdas, an elastic net will be 
+            fit for each lambda supplied.  If no array is passed, glmnet 
+            will generate its own array of lambdas.
+          * weights: An n_obs array. Observation weights.
+          * rel_penalties: An n_preds array. Relative panalty weights for the
+            covariates.  If none is passed, all covariates are penalized 
+            equally.  If an array is passed, then a zero indicates an 
+            unpenalized parameter, and a 1 a fully penalized parameter.
+          * excl_preds: An n_preds array, used to exclude covaraites from 
+            the model. To exclude predictors, pass an array with a 1 in the 
+            first position, then a 1 in the i+1st position excludes the ith 
+            covaraite from model fitting.
+          * box_constraints: An array with dimension 2 * n_obs. Interval 
+            constraints on the fit coefficients.  The (0, i) entry
+            is a lower bound on the ith covariate, and the (1, i) entry is
+            an upper bound.
 
         After fitting, the following attributes are set:
         
@@ -60,8 +81,13 @@ class ElasticNet(GlmNet):
             each fit model.
         '''
         # Predictors and response
-        X = np.asanyarray(X)
-        y = np.asanyarray(y)
+        try:
+            X = np.asanyarray(X)
+            y = np.asanyarray(y)
+        except ValueError:
+            raise ValueError("X and y must be wither numpy arrays, or "
+                             "convertable to numpy arrays."
+                  )
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
@@ -71,6 +97,13 @@ class ElasticNet(GlmNet):
         # version, if this is not ok, we should copy.
         if not self.overwrite_targ_ok:
             y = y.copy()
+        # Validate all the inputs:
+        self._validate_inputs(X, y)
+        self._validate_lambdas(X, y, lambdas)
+        self._validate_weights(X, y, weights)
+        self._validate_rel_penalties(X, y, rel_penalties)
+        self._validate_excl_preds(X, y, excl_preds)
+        self._validate_box_constraints(X, y, box_constraints)
         # Setup is complete, call the wrapper.
         (self._out_n_lambdas,
         self._intercepts,
@@ -93,21 +126,12 @@ class ElasticNet(GlmNet):
                                           self.threshold, 
                                           nlam=self.n_lambdas
                             )
+        self._check_errors()
         # Keep some model metadata
         self._n_fit_obs, self._n_fit_params = X.shape
         # The indexes into the predictor array are off by one due to fortran
         # convention, fix it up.
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
-        # Check for errors, documented in glmnet.f.
-        if self._error_flag != 0:
-            if self._error_flag == 10000:
-                raise ValueError('cannot have max(vp) < 0.0')
-            elif self._error_flag == 7777:
-                raise ValueError('all used predictors have 0 variance')
-            elif self._error_flag < 7777:
-                raise MemoryError('elnet() returned error code %d' % jerr)
-            else:
-                raise Exception('unknown error: %d' % jerr)
 
     def __str__(self):
         return self._str('elastic')

@@ -2,6 +2,7 @@ import numpy as np
 from glmnet_config import (_DEFAULT_THRESH,
                            _DEFAULT_FLMIN,
                            _DEFAULT_NLAM)
+from warnings import warn
 
 class GlmNet(object):
     '''Parent class for glmnet model objects.
@@ -33,12 +34,7 @@ class GlmNet(object):
 
     def __init__(self, 
                  alpha, 
-                 lambdas=None,
-                 weights=None,
                  offsets=None,
-                 rel_penalties=None,
-                 excl_preds=None,
-                 box_constraints=None,
                  standardize=True,
                  max_vars_all=None,
                  max_vars_largest=None,
@@ -52,15 +48,7 @@ class GlmNet(object):
         subclasses.  Accepts the following arguments:
 
           * alpha: Relative weighting between the L1 and L2 regularizers. 
-          * lambdas: Optional user specified list of the lambda parameters.
-          * weights: Optional relative weights for observations when fitting the
-              model, only available for some models.
-          * rel_penalties: Relative penalty weights for the covariates.  A value
-            of zero indicates an unpenalized parameter, 1 a fully penalized
             parameter.
-          * excl_preds: Predictors to exclude from consideration in the model.
-            To exclude varaibles pass an array with 1 as the first entry, then a
-            1 in the i'th entry removes te i+1'st parameter from model fitting.
           * standardize: Boolean flag, do we standardize the predictor
             variables.  Defaults to true, which is important for the regularizer
             to be fair.  Note that the output parameters are allways reported on
@@ -80,18 +68,6 @@ class GlmNet(object):
         '''
         # Relative weighting between L1 and L2 norm
         self.alpha = alpha
-        # User supplied lambdas
-        self.lambdas = lambdas
-        # Weighting for each predictor
-        self.weights = weights
-        # Offsets
-        self.offsets = offsets
-        # Relative penalties for each predictor varaibles, 0 is unpenalized
-        self.rel_penalties = rel_penalties
-        # Predictors to exclude from all models
-        self.excl_preds = excl_preds
-        # Box Constraints on the parameter estimates
-        self.box_constraints = box_constraints
         # Standardize input variables?
         self.standardize = standardize
         # The maximum number of parameters allowed to be nonzero in any model
@@ -109,13 +85,74 @@ class GlmNet(object):
         self.overwrite_pred_ok = overwrite_pred_ok
         self.overwrite_targ_ok = overwrite_targ_ok 
 
+    def _validate_lambdas(self, X, y, lambdas):
+        '''glmnet functions expect either a user supplied array of lambdas, or
+        a signal to construct its own.
+        '''
+        if lambdas is not None:
+            self.lambdas = np.asarray(lambdas)
+            self.n_lambdas = len(lambdas)
+            # Pass >1 to indicate that the user passed in a list of lambdas
+            self.frac_lg_lambda = 2
+        else:
+            self.lambdas = None
+
+    def _validate_weights(self, X, y, weights):
+        '''If no explicit weights are passed, each observation is given the 
+        same weight
+        '''
+        self.weights = (np.ones(X.shape[0]) if weights is None
+                                            else weights
+                       )
+        if self.weights.shape[0] != X.shape[0]:
+            raise ValueError("The weights vector must have the same length "
+                             "as X."
+                  )
+
+    def _validate_rel_penalties(self, X, y, rel_penalties):
+        '''If no explicit penalties are passed, each varaible is given the same
+        penalty
+        '''
+        self.rel_penalties = (np.ones(X.shape[1]) if rel_penalties is None
+                                                  else rel_penalties
+                             )
+        if self.rel_penalties.shape[0] != X.shape[1]:
+            raise ValueError("The relative penalties vector must have the "
+                             "same length as the number of columns in X."
+                  )
+
+    def _validate_excl_preds(self, X, y, excl_preds):
+        '''If no explicit exclusion is supplied, pass a zero to exclude 
+        nothing.
+        '''
+        self.excl_preds = (np.zeros(1) if excl_preds is None
+                                       else excl_preds
+                          )
+        if self.excl_preds.shape[0] != 1:
+            if self.excl_preds.shape[0] != X.shape[1]:
+                raise ValueError("Non null excluded predictors array must "
+                                 "have the same length as the number of "
+                                 "columns in X."
+                      )
+
+    def _validate_box_constraints(self, X, y, box_constraints):
+        '''Box constraints on parameter estimates.'''
+        if box_constraints is None:
+            bc = np.empty((2, X.shape[1]), order='F')
+            bc[0,:] = float(-100)
+            bc[1,:] = float(100)
+            self.box_constraints = bc
+        elif box_constraints.shape[1] != X.shape[1]:
+            raise ValueError("Box constraints must be a vector of shape 2, "
+                            "number of columns in X."
+                  )
+        self.box_constraints = self.box_constraints.copy(order='F')
+
     def _validate_inputs(self, X, y):
         '''Validate and process the prectors and response for model fitting.'''
-        X = np.asanyarray(X)
-        y = np.asanyarray(y)
         # Check that the dimensions work out
-        #if X.shape[0] != y.shape[0]:
-        #    raise ValueError("X and y must have the same length.")
+        if X.shape[0] != y.shape[0]:
+            raise ValueError("X and y must have the same length.")
         # Decide on the largest allowable models
         self.max_vars_all = (
             X.shape[1] if self.max_vars_all is None else self.max_vars_all
@@ -128,53 +165,38 @@ class GlmNet(object):
             raise ValueError("Inconsistant parameters: need max_vars_all "
                              "< max_vars_largest."
                   )
-        # If no explicit weights are passed, each observation is given the same
-        # weight
-        self.weights = (np.ones(X.shape[0]) if self.weights is None
-                                            else self.weights
-                       )
-        if self.weights.shape[0] != X.shape[0]:
-            raise ValueError("The weights vector must have the same length "
-                             "as X."
-                  )
-        # If no explicit penalties are passed, each varaible is given the same
-        # penalty
-        self.rel_penalties = (np.ones(X.shape[1]) if self.rel_penalties is None
-                                                  else self.rel_penalties
-                             )
-        if self.rel_penalties.shape[0] != X.shape[1]:
-            raise ValueError("The relative penalties vector must have the "
-                             "same length as the number of columns in X."
-                  )
-        # If no explicit exclusion is supplied, pass a zero to exclude nothing
-        self.excl_preds = (np.zeros(1) if self.excl_preds is None
-                                       else self.excl_preds
-                          )
-        if self.excl_preds.shape[0] != 1:
-            if self.excl_preds.shape[0] != X.shape[1]:
-                raise ValueError("Non null excluded predictors array must "
-                                 "have the same length as the number of "
-                                 "columns in X."
+
+    def _check_errors(self):
+        '''Check for errors, documented in glmnet.f.'''
+        # Fatal errors...
+        if self._error_flag > 0:
+            if self._error_flag == 10000:
+                raise ValueError('Fatal: Cannot have max(vp) < 0.0.')
+            elif self._error_flag == 7777:
+                raise ValueError('Fatal: all used predictors have 0 variance.')
+            elif self._error_flag < 7777:
+                raise MemoryError('Fatal: Memory allocation error.')
+            else:
+                raise Exception('Fatal: Unknown error code: %d' 
+                                % self._error_flag
                       )
-        # Box constraints on parameter estimates
-        if self.box_constraints is None:
-            bc = np.empty((2, X.shape[1]), order='F')
-            bc[0,:] = float(-100)
-            bc[1,:] = float(100)
-            self.box_constraints = bc
-        elif self.box_constraints.shape[1] != X.shape[1]:
-            raise ValueError("Box constraints must be a vector of shape 2, "
-                            "number of columns in X."
-                  )
-        self.box_constraints = self.box_constraints.copy(order='F')
-        # User supplied list of lambdas
-        if self.lambdas is not None:
-            self.lambdas = np.asarray(self.lambdas)
-            self.n_lambdas = len(self.lambdas)
-            # Pass >1 to indicate that the user passed in a list of lambdas
-            self.frac_lg_lambda = 2
-        else:
-            self.lambdas = None
+        # Non-fatal errors...
+        elif self._error_flag < 0:
+            if self._error_flag > -10000:
+                last_lambda = -self._error_flag
+                w_msg = ("Convergence for {0:d}'th lambda value not reached "
+                         "after {1:d} iterations.")
+                warn(w_msg.format(last_lambda, self._n_passes), RuntimeWarning)
+            elif self._error_flag <= -10000:
+                last_lambda = -(self._error_flag + 10000)
+                w_msg = ("Number of non-zero coefficients exceeds {0:d} at "
+                         "{1:d}th lambda value.")
+                warn(w_msg.format(self.max_vars_all, last_lambda),
+                     RuntimeWarning
+                )
+            else:
+                warn("Unknown warning %d" % self._error_flag)
+
         
     def _str(self, name):
         s = ("A %s net model fit on %d observations and %d parameters.     \n"
@@ -191,11 +213,6 @@ class GlmNet(object):
     def _clone(self):
         '''Copy an unfit glmnet object.'''
         return self.__class__(**self.__dict__)
-
-    def fit(self, X, y):
-        '''Fit the model.'''
-        self._validate_inputs(X, y)
-        self._fit(X, y)
 
     @property
     def intercepts(self):

@@ -25,24 +25,9 @@ class LogisticNet(GlmNet):
     predictor.
     '''
 
-    def __init__(self, max_iterations=10, opt_type=1, **kwargs):
-        '''LogNet accepts the following two configuration parameters on
-        configuration.
-
-          * max_iterations: The maximum number of descent iterations to perform
-            for each value of lambda.
-          * opt_type: The optimization pocedure used to fit each model.
-              0: Newton-Ralphson
-              1: Modified Newrons.  This is recommended in the fortran
-              documentation.
-        '''
-        GlmNet.__init__(self, **kwargs)
-        # The maximum number of iterations to preform for a single lambda
-        self._max_iterations = np.array([max_iterations])
-        # The optimizations type to perform
-        self._opt_type = np.array([opt_type])
-
-    def _fit(self, X, y):
+    def fit(self, X, y,
+            lambdas=None, weights=None, rel_penalties=None,
+            excl_preds=None, box_constraints=None, offsets=None):
         '''Fit a logistic or multinomial net model.
 
         Arguments:
@@ -58,6 +43,27 @@ class LogisticNet(GlmNet):
             - An n_obs array.  In this case the array must contain a discrete
               number of values, and is converted into the previous form before
               being passed to the model.
+
+        Optional Arguments:
+
+          * lambdas: A user supplied list of lambdas, an elastic net will be 
+            fit for each lambda supplied.  If no array is passed, glmnet 
+            will generate its own array of lambdas.
+          * weights: An n_obs array. Observation weights.
+          * rel_penalties: An n_preds array. Relative panalty weights for the
+            covariates.  If none is passed, all covariates are penalized 
+            equally.  If an array is passed, then a zero indicates an 
+            unpenalized parameter, and a 1 a fully penalized parameter.
+          * excl_preds: An n_preds array, used to exclude covaraites from 
+            the model. To exclude predictors, pass an array with a 1 in the 
+            first position, then a 1 in the i+1st position excludes the ith 
+            covaraite from model fitting.
+          * box_constraints: An array with dimension 2 * n_obs. Interval 
+            constraints on the fit coefficients.  The (0, i) entry
+            is a lower bound on the ith covariate, and the (1, i) entry is
+            an upper bound.
+          * offsets: A n_preds * n_classes array. Used as initial offsets for
+            the model fitting. 
 
         After fitting, the following attributes are set:
         
@@ -81,17 +87,15 @@ class LogisticNet(GlmNet):
           * _error_flag: Error flag from the fortran code.
 
         Public Attributes:
-
-          * intecepts: An array of langth _out_n_labdas.  The intercept for
-            each model.
-          * r_sqs: An array of length _out_n_lambdas containing the r-squared
-            statistic for each model.
+          
+          * null_dev: The devaince of the null model.
+          * exp_dev: The devaince explained by the model.
           * out_lambdas: An array containing the lambda values associated with
             each fit model.
         '''
         X = np.asanyarray(X)
-        # Fortran expects an n_obs * n_classes array.  If a one dimensional
-        # array is passed, we construct an appropriate widening. 
+        # Fortran expects an n_obs * n_classes array for y.  If a one 
+        # dimensional array is passed, we construct an appropriate widening. 
         y = np.asanyarray(y)
         if len(y.shape) == 1:
             self.logistic = True
@@ -99,16 +103,7 @@ class LogisticNet(GlmNet):
             y = np.float64(np.column_stack(y == c for c in y_classes))
         else:
             self.logistic = False
-        # Make a copy if we are not able to overwrite X with its standardized 
-        # version. Note that if X is not fortran contiguous, then it will be 
-        # copied anyway.
-        if np.isfortran(X) and not self.overwrite_pred_ok:
-            X = X.copy(order='F')
-        # The target array will usually be overwritten with its standardized
-        # version, if this is not ok, we should copy.
-        if np.isfortran(X) and not self.overwrite_targ_ok:
-            y = y.copy(order='F')
-        # Count the number of input levels of y.
+        # Count the number of classes in y.
         y_level_count = y.shape[1]
         # Two class predictions are handled as a special case, as is usual 
         # with logistic models
@@ -116,9 +111,23 @@ class LogisticNet(GlmNet):
             self.y_level_count = np.array([1])
         else:
             self.y_level_count = np.array([y_level_count])
-        # If no explicit offset was setup, we assume a zero offset
-        if self.offsets is None:
-            self.offsets = np.zeros((X.shape[0], y_level_count), order='F')
+        # Make a copy if we are not able to overwrite X with its standardized 
+        # version. Note that if X is not fortran contiguous, then it will be 
+        # copied anyway.
+        if np.isfortran(X) and not self.overwrite_pred_ok:
+            X = X.copy(order='F')
+        # The target array will usually be overwritten with its standardized
+        # version, if this is not ok, we should copy.
+        if np.isfortran(y) and not self.overwrite_targ_ok:
+            y = y.copy(order='F')
+        # Validate all the inputs:
+        self._validate_inputs(X, y)
+        self._validate_lambdas(X, y, lambdas)
+        self._validate_weights(X, y, weights)
+        self._validate_rel_penalties(X, y, rel_penalties)
+        self._validate_excl_preds(X, y, excl_preds)
+        self._validate_box_constraints(X, y, box_constraints)
+        self._validate_offsets(X, y, offsets)
         # Setup is complete, call the wrapper
         (self._out_n_lambdas,
         self._intercepts,
@@ -143,21 +152,25 @@ class LogisticNet(GlmNet):
                                            self.threshold, 
                                            nlam=self.n_lambdas
                             )
+        self._check_errors()
         # Keep some model metadata
         self._n_fit_obs, self._n_fit_params = X.shape
         # The indexes into the predictor array are off by one due to fortran
         # convention, fix it up.
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
-        # Check for errors, documented in glmnet.f.
-        if self._error_flag != 0:
-            if self._error_flag == 10000:
-                raise ValueError('cannot have max(vp) < 0.0')
-            elif self._error_flag == 7777:
-                raise ValueError('all used predictors have 0 variance')
-            elif self._error_flag < 7777:
-                raise MemoryError('elnet() returned error code %d' % self._error_flag)
-            else:
-                raise Exception('unknown error: %d' % self._error_flag)
+
+    def _validate_offsets(self, X, y, offsets):
+        '''If no explicit offset was setup, we assume a zero offset.'''
+        if offsets is None:
+            self.offsets = np.zeros((X.shape[0], y.shape[1]), order='F')
+        else:
+            self.offsets = offsets
+        if (self.offsets.shape[0] != X.shape[0] or
+            self.offsets.shape[1] != y.shape[1]):
+            raise ValueError("Offsets must share its first dimenesion with X "
+                             "and its second dimenstion must be the number of "
+                             "response classes."
+                  )
 
     def __str__(self):
         return self._str('logistic')
