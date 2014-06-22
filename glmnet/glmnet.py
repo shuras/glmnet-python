@@ -30,12 +30,15 @@ class GlmNet(object):
     supply a list of alphas, in this case the default behavior is overriden and
     a glmnet is fit for each value of lambda the user supplies.
     '''
+
     def __init__(self, 
                  alpha, 
                  lambdas=None,
                  weights=None,
+                 offsets=None,
                  rel_penalties=None,
                  excl_preds=None,
+                 box_constraints=None,
                  standardize=True,
                  max_vars_all=None,
                  max_vars_largest=None,
@@ -81,10 +84,14 @@ class GlmNet(object):
         self.lambdas = lambdas
         # Weighting for each predictor
         self.weights = weights
+        # Offsets
+        self.offsets = offsets
         # Relative penalties for each predictor varaibles, 0 is unpenalized
         self.rel_penalties = rel_penalties
         # Predictors to exclude from all models
         self.excl_preds = excl_preds
+        # Box Constraints on the parameter estimates
+        self.box_constraints = box_constraints
         # Standardize input variables?
         self.standardize = standardize
         # The maximum number of parameters allowed to be nonzero in any model
@@ -107,8 +114,8 @@ class GlmNet(object):
         X = np.asanyarray(X)
         y = np.asanyarray(y)
         # Check that the dimensions work out
-        if X.shape[0] != y.shape[0]:
-            raise ValueError("X and y must have the same length.")
+        #if X.shape[0] != y.shape[0]:
+        #    raise ValueError("X and y must have the same length.")
         # Decide on the largest allowable models
         self.max_vars_all = (
             X.shape[1] if self.max_vars_all is None else self.max_vars_all
@@ -121,7 +128,6 @@ class GlmNet(object):
             raise ValueError("Inconsistant parameters: need max_vars_all "
                              "< max_vars_largest."
                   )
-
         # If no explicit weights are passed, each observation is given the same
         # weight
         self.weights = (np.ones(X.shape[0]) if self.weights is None
@@ -150,6 +156,17 @@ class GlmNet(object):
                                  "have the same length as the number of "
                                  "columns in X."
                       )
+        # Box constraints on parameter estimates
+        if self.box_constraints is None:
+            bc = np.empty((2, X.shape[1]), order='F')
+            bc[0,:] = float(-100)
+            bc[1,:] = float(100)
+            self.box_constraints = bc
+        elif self.box_constraints.shape[1] != X.shape[1]:
+            raise ValueError("Box constraints must be a vector of shape 2, "
+                            "number of columns in X."
+                  )
+        self.box_constraints = self.box_constraints.copy(order='F')
         # User supplied list of lambdas
         if self.lambdas is not None:
             self.lambdas = np.asarray(self.lambdas)

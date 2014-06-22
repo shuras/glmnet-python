@@ -109,28 +109,34 @@ class LogisticNet(GlmNet):
         if np.isfortran(X) and not self.overwrite_targ_ok:
             y = y.copy(order='F')
         # Count the number of input levels of y.
-        y_level_count = np.unique(y).shape[0]
+        y_level_count = y.shape[1]
         # Two class predictions are handled as a special case, as is usual 
         # with logistic models
         if y_level_count == 2:
             self.y_level_count = np.array([1])
         else:
             self.y_level_count = np.array([y_level_count])
+        # If no explicit offset was setup, we assume a zero offset
+        if self.offsets is None:
+            self.offsets = np.zeros((X.shape[0], y_level_count), order='F')
         # Setup is complete, call the wrapper
         (self._out_n_lambdas,
         self._intercepts,
         self._comp_coef,
         self._p_comp_coef,
         self._n_comp_coef,
+        self.null_dev,
         self.exp_dev,
         self.out_lambdas,
         self._n_passes,
         self._error_flag) = _glmnet.lognet(self.alpha, 
                                            self.y_level_count,
-                                           X, 
+                                           X,
                                            y, 
+                                           self.offsets,
                                            self.excl_preds, 
                                            self.rel_penalties,
+                                           self.box_constraints,
                                            self.max_vars_all, 
                                            self.frac_lg_lambda, 
                                            self.lambdas,
@@ -149,9 +155,9 @@ class LogisticNet(GlmNet):
             elif self._error_flag == 7777:
                 raise ValueError('all used predictors have 0 variance')
             elif self._error_flag < 7777:
-                raise MemoryError('elnet() returned error code %d' % jerr)
+                raise MemoryError('elnet() returned error code %d' % self._error_flag)
             else:
-                raise Exception('unknown error: %d' % jerr)
+                raise Exception('unknown error: %d' % self._error_flag)
 
     def __str__(self):
         return self._str('logistic')

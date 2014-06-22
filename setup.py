@@ -2,12 +2,6 @@ from numpy.distutils.misc_util import Configuration
 from numpy.distutils.system_info import get_info
 import os, sys
 
-import sys
-
-fflags= '-fdefault-real-8 -ffixed-form'
-
-# TODO: Fix it so that these flags are default.
-
 config = Configuration(
     'glmnet',
     parent_package=None,
@@ -15,18 +9,25 @@ config = Configuration(
 )
 
 f_sources = ['glmnet/glmnet.pyf','glmnet/glmnet.f']
+fflags= ['-fdefault-real-8', '-ffixed-form']
 
-config.add_extension(name='_glmnet',sources=f_sources)
+config.add_extension(name='_glmnet',
+                     sources=f_sources,
+                     extra_f77_compile_args=fflags,
+                     extra_f90_compile_args=fflags
+)
+
 config_dict = config.todict()
+
 if __name__ == '__main__':
     from numpy.distutils.core import setup
-    setup(version='1.1-5',
+    setup(version='0.9',
           description='Python wrappers for the GLMNET package',
-          author='David Warde-Farley',
-          author_email='dwf@cs.toronto.edu',
-          url='github.com/dwf/glmnet-python',
+          author='Matthew Drury',
+          author_email='matthew.drury.83@gmail.com',
+          url='github.com/madrury/glmnet-python',
           license='GPL2',
           requires=['NumPy (>= 1.3)'],
-          packages=['glmnet'],
-          **config_dict)
+          **config_dict
+)
 

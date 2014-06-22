@@ -10,7 +10,7 @@ print display_bar
 X = np.random.randn(5000, 40)
 w = np.random.randn(40)
 w[20:] = 0
-y = np.dot(X, w)
+y = np.dot(X, w)[:5000]
 
 enet = ElasticNet(alpha=1)
 enet.fit(X, y)
@@ -34,7 +34,7 @@ print display_bar
 print "Fit a logistic net on some fake data."
 print display_bar
 
-X = np.random.randn(1000, 40)
+X = np.random.randn(100000, 40)
 w = np.random.randn(40)
 w[20:] = 0
 p = 1 /( 1 + np.exp(-np.dot(X, w)) )
@@ -53,7 +53,7 @@ preds = lnet.predict(X)
 print p[:10]
 print preds[:10,np.shape(preds)[1]-1]
 
-print 
-print lnet.deviance(X, y)
-#
-#lnet.plot_path()
+#print 
+#print lnet.deviance(X, y)
+##
+##lnet.plot_path()

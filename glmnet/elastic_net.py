@@ -86,6 +86,7 @@ class ElasticNet(GlmNet):
                                           self.weights, 
                                           self.excl_preds, 
                                           self.rel_penalties,
+                                          self.box_constraints,
                                           self.max_vars_all, 
                                           self.frac_lg_lambda, 
                                           self.lambdas, 
