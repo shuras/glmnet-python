@@ -151,16 +151,26 @@ class ElasticNet(GlmNet):
         '''Produce model predictions from new data.'''
         return self._predict_lp(X)
 
-    def deviance(self, X, y):
+    def deviance(self, X, y, weights = None):
         '''Calculate the normal deviance (i.e. sum of squared errors) for
         every lambda.'''
+        if weights is not None and weights.shape[0] != X.shape[0]:
+            raise ValueError("The weights vector must have the same length "
+                             "as X."
+                  )
         y_hat = self.predict(X)
         # Take the response y, and repeat it as a column to produce a matrix
         # of the same dimensions as y_hat
         y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
         #print y_stacked
-        sum_of_sq_residuals = (y_stacked - y_hat)**2
-        return np.apply_along_axis(np.sum, 0, sum_of_sq_residuals)
+        if weights is None:
+            sq_residuals = (y_stacked - y_hat)**2
+        else:
+            w_stacked = np.tile(np.array([weights]).transpose(),
+                                y_hat.shape[1]
+                        )
+            sq_residuals = w_stacked * (y_stacked - y_hat)**2
+        return np.apply_along_axis(np.sum, 0, sq_residuals)
 
     def plot_path(self):
         self._plot_path('elastic') 
