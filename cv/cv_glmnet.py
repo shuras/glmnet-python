@@ -1,37 +1,7 @@
 import numpy as np
-from sklearn.cross_validation import KFold
 from sklearn.externals.joblib import Parallel, delayed
-
-def _fit_and_score_elastic_net(elastic_net, X, y, 
-                               train_inds, test_inds, 
-                               **kwargs):
-    if 'weights' in kwargs:
-        weights = kwargs['weights']
-        train_weights = weights[train_inds]
-        test_weights = weights[test_inds]
-    else:
-        train_weights, test_weights = None, None
-    del kwargs['weights']
-    elastic_net.fit(X[train_inds], y[train_inds], 
-                    weights=train_weights, **kwargs
-                )
-    return (elastic_net.out_lambdas[:elastic_net._out_n_lambdas], 
-            elastic_net.deviance(X[test_inds], y[test_inds], 
-                                 weights=test_weights
-                        )
-           )
-
-def _fit_and_score_logistic_net(logistic_net, X, y, 
-                                train_inds, test_inds,
-                                **kwargs):
-    logistic_net.fit(X[train_inds], y[train_inds], **kwargs)
-    return (logistic_net.out_lambdas[:logistic_net._out_n_lambdas], 
-            logistic_net.deviance(X[test_inds], y[test_inds])
-           )
-
-fit_and_score_switch = {'ElasticNet': _fit_and_score_elastic_net,
-                        'LogisticNet': _fit_and_score_logistic_net
-                       }
+from fit_and_scorers import fit_and_score_switch
+from fold_generators import unweighted_k_fold, weighted_k_fold
 
 def _clone(glmnet):
     return glmnet.__class__(**glmnet.__dict__)
@@ -63,11 +33,19 @@ class CVGlmNet(object):
 
     def fit(self, X, y, **kwargs):
         '''Determine the optimal value of lambda by cross validation, and fit
-        a single glmnet with this value of lambda.
+        a single glmnet with this value of lambda on the full data.
         '''
         # Determine the indicies of the various train and test sets for the 
         # cross validation.
-        cv_folds = KFold(X.shape[0], n_folds=self.n_folds, shuffle=self.shuffle) 
+        if 'weights' in kwargs:
+            cv_folds = weighted_k_fold(X.shape[0], n_folds=self.n_folds,
+                                                   shuffle=self.shuffle,
+                                                   weights=kwargs['weights']
+                       )
+        else:
+            cv_folds = unweighted_k_fold(X.shape[0], n_folds=self.n_folds, 
+                                                     shuffle=self.shuffle
+                       ) 
         # Copy the glmnet to fit as the final model.
         base_estimator = _clone(self._base_estimator)
         fit_and_score = fit_and_score_switch[base_estimator.__class__.__name__] 
