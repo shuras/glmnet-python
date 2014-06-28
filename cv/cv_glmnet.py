@@ -25,61 +25,68 @@ class CVGlmNet(object):
               folds be shuffled randomly.
           * verbose: Ammount of talkyness.
         '''
-        self._base_estimator = glmnet
+        self.base_estimator = glmnet
         self.n_folds = n_folds
         self.n_jobs = n_jobs
         self.shuffle = shuffle
         self.verbose = verbose
 
-    def fit(self, X, y, **kwargs):
+    def fit(self, X, y, weights = None, lambdas = None, **kwargs):
         '''Determine the optimal value of lambda by cross validation, and fit
         a single glmnet with this value of lambda on the full data.
         '''
         # Determine the indicies of the various train and test sets for the 
         # cross validation.
-        if 'weights' in kwargs:
+        if weights is not None:
             cv_folds = weighted_k_fold(X.shape[0], n_folds=self.n_folds,
                                                    shuffle=self.shuffle,
-                                                   weights=kwargs['weights']
+                                                   weights=weights
                        )
         else:
             cv_folds = unweighted_k_fold(X.shape[0], n_folds=self.n_folds, 
                                                      shuffle=self.shuffle
                        ) 
-        # Copy the glmnet to fit as the final model.
-        base_estimator = _clone(self._base_estimator)
+        # Copy the glmnet so we can fit the instance passed in as the final
+        # model.
+        base_estimator = _clone(self.base_estimator)
         fit_and_score = fit_and_score_switch[base_estimator.__class__.__name__] 
+        # Determine the sequence of lambda values to fit using cross validation.
+        if lambdas is None:
+            lmax = base_estimator._max_lambda(X, y)
+            lmin = base_estimator.frac_lg_lambda * lmax  
+            lambdas = np.logspace(start = np.log10(lmin),
+                                stop = np.log10(lmax),
+                                num = base_estimator.n_lambdas,
+                      )[::-1]
+        print "LAMBDA MAX: ", lmax
+        print "LAMBDA MIN: ", lmin
         # Fit in-fold glmnets in parallel.  For each such model, pass back the 
         # series of lambdas fit and the out-of-fold deviances for each such 
         # lambda.
-        ld_pairs = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                     delayed(fit_and_score)(_clone(base_estimator), X, y,
-                                            train_inds, test_inds,
-                                            **kwargs
-                                           )
-                     for train_inds, test_inds in cv_folds
-                   )
-        self.lambdas = tuple(ld[0] for ld in ld_pairs)
-        self.deviances = tuple(ld[1] for ld in ld_pairs)
-        # Determine the best lambda in each series, i.e. the value of lambda
-        # that minimizes the out of fold deviance.
-        best_lambdas = tuple(lambdas[np.argmin(devs)] 
-                             for lambdas, devs in ld_pairs
-                       )
-        # The optimal lambda
-        self.best_lambda = np.mean(best_lambdas)
-        # Refit a glmnet on the entire data set uning the value of lambda
-        # determined to be optimal
-        base_estimator.fit(X, y, lambdas=[self.best_lambda], **kwargs)
-        self.best_model = base_estimator
-
-    @property
-    def intercepts(self):
-        return self.best_model.intercepts.squeeze()
-
-    @property
-    def coefficients(self):
-        return self.best_model.coefficients.squeeze()
-
-    def predict(self, X):
-        return self.best_model.predict(X).squeeze()
+        deviances = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                             delayed(fit_and_score)(_clone(base_estimator), 
+                                                    X, y,
+                                                    train_inds, test_inds,
+                                                    weights, lambdas,
+                                                    **kwargs
+                                                   )
+                             for train_inds, test_inds in cv_folds
+                             )
+        # Determine the best lambdas, i.e. the value of lambda that minimizes
+        # the out of fold deviances
+        dev_stack = np.vstack(deviances)
+        oof_deviances = np.mean(dev_stack, axis=0)
+        # TODO: Implement std dev aware strat.
+        best_lambda_ind = np.argmin(oof_deviances)
+        best_lambda = lambdas[best_lambda_ind]
+        # Determine the standard deviation of deviances for each lambda, used
+        # for plotting method.
+        oof_stds = np.std(dev_stack, axis=0)
+        # Refit a glmnet on the entire data set
+        self.base_estimator.fit(X, y, weights=weights, lambdas=lambdas, **kwargs)
+        # Set attributes
+        self.oof_deviances = oof_deviances 
+        self.oof_stds = oof_stds
+        self.lambdas = lambdas
+        self.best_lambda_ind = best_lambda_ind
+        self.best_lambda = best_lambda

@@ -1,6 +1,5 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt 
+from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
 
@@ -146,6 +145,14 @@ class ElasticNet(GlmNet):
         return self._comp_coef[:np.max(self._n_comp_coef),
                                :self._out_n_lambdas
                 ]
+
+    def _max_lambda(self, X, y):
+        '''Return the maximum value of lambda useful for fitting, i.e. that
+        which first forces all coefficients to zero.
+        '''
+        X_scaled = preprocessing.scale(X)
+        dots = y.dot(X_scaled)
+        return np.max(np.abs(dots)) / (self.alpha * X.shape[0])
 
     def predict(self, X):
         '''Produce model predictions from new data.'''

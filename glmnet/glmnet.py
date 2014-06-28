@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt 
 from glmnet_config import (_DEFAULT_THRESH,
                            _DEFAULT_FLMIN,
                            _DEFAULT_NLAM)
@@ -243,7 +245,7 @@ class GlmNet(object):
         for coef_path in self.coefficients:
             ax.plot(xvals, coef_path[1:])
         ax.set_title("Regularization paths for %s net with alpha = %s" % 
-                     name, self.alpha)
+                     (name, self.alpha))
         ax.set_xlabel("log(lambda)")
         ax.set_ylabel("Parameter Value")
         plt.show()

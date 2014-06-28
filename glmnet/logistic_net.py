@@ -93,6 +93,8 @@ class LogisticNet(GlmNet):
           * out_lambdas: An array containing the lambda values associated with
             each fit model.
         '''
+        if weights is not None:
+            raise ValueError("LogisticNet cannot be fit with weights.")
         X = np.asanyarray(X)
         # Fortran expects an n_obs * n_classes array for y.  If a one 
         # dimensional array is passed, we construct an appropriate widening. 
@@ -201,6 +203,9 @@ class LogisticNet(GlmNet):
         return ccsq[:np.max(self._n_comp_coef),
                     :self._out_n_lambdas
                 ]
+
+    def _max_lambda(self, X, y):
+        raise NotImplementedError("Max lambda not yet implemented...")
 
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
