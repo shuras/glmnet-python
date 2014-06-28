@@ -214,7 +214,8 @@ class LogisticNet(GlmNet):
         y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
         #print y_stacked
         bin_dev = y_stacked*np.log(y_hat) + (1 - y_stacked)*np.log(1 - y_hat)
-        return np.apply_along_axis(np.sum, 0, -2*bin_dev)
+        normfac = X.shape[0]
+        return np.apply_along_axis(np.sum, 0, -2*bin_dev) / normfac
 
     def _plot_path(self):
         self._plot_path('logistic')

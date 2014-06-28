@@ -162,7 +162,6 @@ class ElasticNet(GlmNet):
         # Take the response y, and repeat it as a column to produce a matrix
         # of the same dimensions as y_hat
         y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
-        #print y_stacked
         if weights is None:
             sq_residuals = (y_stacked - y_hat)**2
         else:
@@ -170,7 +169,12 @@ class ElasticNet(GlmNet):
                                 y_hat.shape[1]
                         )
             sq_residuals = w_stacked * (y_stacked - y_hat)**2
-        return np.apply_along_axis(np.sum, 0, sq_residuals)
+        # Determine the appropriate normalization factor:
+        if weights is None:
+            normfac = X.shape[0]
+        else:
+            normfac = np.sum(weights)
+        return np.apply_along_axis(np.sum, 0, sq_residuals) / normfac
 
     def plot_path(self):
         self._plot_path('elastic') 
