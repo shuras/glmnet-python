@@ -8,9 +8,9 @@ display_bar = '-'*70
 X, y = make_regression(
     n_samples = 5000,
     n_features = 100,
-    n_informative = 20,
-    effective_rank = 10,
-    noise = .1,
+    n_informative = 40,
+    effective_rank = 30,
+    noise = 8,
 )
 
 print display_bar
@@ -23,3 +23,5 @@ enet_cv.fit(X, y)
 
 print display_bar
 print enet_cv.base_estimator
+
+enet_cv.plot_oof_devs()

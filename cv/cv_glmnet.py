@@ -1,5 +1,7 @@
 import numpy as np
 from sklearn.externals.joblib import Parallel, delayed
+import matplotlib
+import matplotlib.pyplot as plt 
 from fit_and_scorers import fit_and_score_switch
 from fold_generators import unweighted_k_fold, weighted_k_fold
 
@@ -90,3 +92,20 @@ class CVGlmNet(object):
         self.lambdas = lambdas
         self.best_lambda_ind = best_lambda_ind
         self.best_lambda = best_lambda
+
+    def plot_oof_devs(self):
+        plt.clf()
+        fig, ax = plt.subplots()
+        xvals = np.log(self.lambdas)
+        ax.plot(xvals, self.oof_deviances, c='blue')
+        ax.scatter(xvals, self.oof_deviances, 
+                   s=3, c='blue', alpha=.5
+        )
+        ax.errorbar(xvals, self.oof_deviances, yerr=self.oof_stds, 
+                    c='grey', alpha=.5
+        )
+        ax.axvline(np.log(self.best_lambda), alpha=.5)
+        ax.set_title("Cross validation estimates of out of sample deviance.")
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Deviance")
+        plt.show()
