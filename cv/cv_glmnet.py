@@ -54,11 +54,11 @@ class CVGlmNet(object):
         fit_and_score = fit_and_score_switch[base_estimator.__class__.__name__] 
         # Determine the sequence of lambda values to fit using cross validation.
         if lambdas is None:
-            lmax = base_estimator._max_lambda(X, y)
+            lmax = base_estimator._max_lambda(X, y, weights=weights)
             lmin = base_estimator.frac_lg_lambda * lmax  
             lambdas = np.logspace(start = np.log10(lmin),
-                                stop = np.log10(lmax),
-                                num = base_estimator.n_lambdas,
+                                  stop = np.log10(lmax),
+                                  num = base_estimator.n_lambdas,
                       )[::-1]
         print "LAMBDA MAX: ", lmax
         print "LAMBDA MIN: ", lmin

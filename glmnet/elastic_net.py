@@ -146,13 +146,23 @@ class ElasticNet(GlmNet):
                                :self._out_n_lambdas
                 ]
 
-    def _max_lambda(self, X, y):
+    def _max_lambda(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
         which first forces all coefficients to zero.
         '''
         X_scaled = preprocessing.scale(X)
-        dots = y.dot(X_scaled)
-        return np.max(np.abs(dots)) / (self.alpha * X.shape[0])
+        if weights is None:
+            dots = y.dot(X_scaled)
+            normfac = X.shape[0]
+        else:
+            y_wtd = y*weights
+            dots = y_wtd.dot(X_scaled)
+            normfac = np.sum(weights) 
+        # An alpha of zero (ridge) breaks the maximum lambda logic, the 
+        # coefficients are never all zero - so we readjust to a small
+        # value.
+        alpha = self.alpha if self.alpha > .0001 else .0001
+        return np.max(np.abs(dots)) / (alpha * normfac) 
 
     def predict(self, X):
         '''Produce model predictions from new data.'''
@@ -171,15 +181,12 @@ class ElasticNet(GlmNet):
         y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
         if weights is None:
             sq_residuals = (y_stacked - y_hat)**2
+            normfac = X.shape[0]
         else:
             w_stacked = np.tile(np.array([weights]).transpose(),
                                 y_hat.shape[1]
                         )
             sq_residuals = w_stacked * (y_stacked - y_hat)**2
-        # Determine the appropriate normalization factor:
-        if weights is None:
-            normfac = X.shape[0]
-        else:
             normfac = np.sum(weights)
         return np.apply_along_axis(np.sum, 0, sq_residuals) / normfac
 
