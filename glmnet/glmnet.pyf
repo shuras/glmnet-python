@@ -513,7 +513,6 @@ python module _glmnet ! in
             integer optional :: kopt=0 ! Use Newton's by default
 
 	    ! Outputs
-            integer :: lmu
             integer intent(out) :: lmu
             real*8 intent(out),dimension(nc,nlam),depend(nlam,nc) :: a0
             real*8 intent(out),dimension(nx,nc,nlam),depend(nlam,nc) :: ca

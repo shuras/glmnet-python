@@ -223,7 +223,7 @@ class GlmNet(object):
           A _n_comp_coef * _out_n_lambdas array containing the fit model
         coefficients for each value of lambda.
         '''
-        return self._intercepts[:self._out_n_lambdas]
+        return self._intercepts.ravel()[:self._out_n_lambdas]
 
     def _predict_lp(self, X):
         '''Return model predictions on a linear predictor scale.
