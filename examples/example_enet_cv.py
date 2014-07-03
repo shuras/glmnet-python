@@ -12,6 +12,7 @@ X, y = make_regression(
     effective_rank = 30,
     noise = 8,
 )
+w = np.random.uniform(size=5000)
 
 print display_bar
 print "Cross validate an elastic net on some fake data"
@@ -19,9 +20,13 @@ print display_bar
 
 enet = ElasticNet(alpha=.1)
 enet_cv = CVGlmNet(enet, n_jobs=1)
-enet_cv.fit(X, y)
+enet_cv.fit(X, y, weights=w)
+print enet_cv.base_estimator.lambdas
 
 print display_bar
 print enet_cv.base_estimator
 
-enet_cv.plot_oof_devs()
+#enet_cv.plot_oof_devs()
+enet = ElasticNet(alpha=.1)
+enet.fit(X, y, weights=w)
+print enet.out_lambdas
