@@ -1,6 +1,5 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt 
+from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
 
@@ -204,8 +203,43 @@ class LogisticNet(GlmNet):
                     :self._out_n_lambdas
                 ]
 
-    def _max_lambda(self, X, y):
-        raise NotImplementedError("Max lambda not yet implemented...")
+    def _max_lambda(self, X, y, weights=None):
+        '''Return the maximum value of lambda useful for fitting, i.e. that
+        which first forces all coefficients to zero.
+
+          This calculation is derived from the discussion in "Regularization 
+        Paths for Generalized Linear Models via Coordinate Descent" in the 
+        section "Regularized Logistic Regression", using an analogy with the 
+        linear case with weighted samples.  We take the initial coefficients 
+        to be:
+            \beta_0 = log(p/(1-p))
+            \beta_i = 0
+        I.e., our initial model is the intercept only model.
+        
+           There is one complication: the working weights in the quadratic 
+        approximation to the logistic loss are not normalized, while the 
+        discussion in the linear case makes this assumption.  To compensate
+        for this, we must adjust the value of lambda to live on the same
+        scale as the weights, which causes the normalization factor to drop
+        out of the equation.
+        '''
+        if weights is not None:
+            raise ValueError("LogisticNet cannot be fit with weights.")
+        X_scaled = preprocessing.scale(X)
+        # Working response
+        p = np.mean(y)
+        working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
+        # Working weights
+        working_weights = p*(1 - p) / (X.shape[0])
+        # Now mimic the calculation for the quadratic case
+        y_wtd = working_resp * working_weights
+        dots = y_wtd.dot(X_scaled)
+        normfac = np.sum(working_weights)
+        # An alpha of zero (ridge) breaks the maximum lambda logic, the 
+        # coefficients are never all zero - so we readjust to a small
+        # value.
+        alpha = self.alpha if self.alpha > .0001 else .0001
+        return np.max(np.abs(dots)) / alpha
 
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
@@ -222,5 +256,5 @@ class LogisticNet(GlmNet):
         normfac = X.shape[0]
         return np.apply_along_axis(np.sum, 0, -2*bin_dev) / normfac
 
-    def _plot_path(self):
+    def plot_path(self):
         self._plot_path('logistic')

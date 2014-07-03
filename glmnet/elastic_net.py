@@ -149,6 +149,9 @@ class ElasticNet(GlmNet):
     def _max_lambda(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
         which first forces all coefficients to zero.
+
+          This calculation is derived from the discussion in "Regularization 
+        Paths for Generalized Linear Models via Coordinate Descent"
         '''
         X_scaled = preprocessing.scale(X)
         if weights is None:
