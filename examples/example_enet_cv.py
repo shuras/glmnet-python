@@ -21,12 +21,5 @@ print display_bar
 enet = ElasticNet(alpha=.1)
 enet_cv = CVGlmNet(enet, n_jobs=1)
 enet_cv.fit(X, y, weights=w)
-print enet_cv.base_estimator.lambdas
 
-print display_bar
-print enet_cv.base_estimator
-
-#enet_cv.plot_oof_devs()
-enet = ElasticNet(alpha=.1)
-enet.fit(X, y, weights=w)
-print enet.out_lambdas
+enet_cv.plot_oof_devs()
