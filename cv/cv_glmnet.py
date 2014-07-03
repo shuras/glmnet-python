@@ -60,8 +60,6 @@ class CVGlmNet(object):
                                   stop = np.log10(lmax),
                                   num = base_estimator.n_lambdas,
                       )[::-1]
-        print "LAMBDA MAX: ", lmax
-        print "LAMBDA MIN: ", lmin
         # Fit in-fold glmnets in parallel.  For each such model, pass back the 
         # series of lambdas fit and the out-of-fold deviances for each such 
         # lambda.
