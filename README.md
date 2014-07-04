@@ -46,7 +46,7 @@ visualized, that is, the values of the model parameters for each value of
 enet.plot_paths()
 ```
 
-![Param-Plot](https://github.com/madrury/glmnet-python/tree/master/glmnet/images/reg_paths.png)
+![Param-Plot](https://raw.githubusercontent.com/madrury/glmnet-python/master/images/reg_paths.png)
 
 To select a value of `lambda` cross-validation can be used:
 
@@ -75,8 +75,7 @@ of `lambda` can be viewed, along with their standard deviations:
 enet_cv.plot_oof_devs()
 ```
 
-![OOF-Dev-Plot](github.com/madrury/glmnet-python/tree/master/glmnet/images/oof_dev.png)
-
+![OOF-Dev-Plot](https://raw.githubusercontent.com/madrury/glmnet-python/master/images/oof_dev.png)
 The cross validation object can then be used to generate predictions at the
 optimal value of `lambda`:
 
