@@ -10,8 +10,8 @@ It is very much a work in progress.
 Authors
 -------
 
-David Warde-Farley (2010)
-Matthew Drury (2014)
+* David Warde-Farley (2010)
+* Matthew Drury (2014)
 
 Use
 ---
@@ -65,7 +65,7 @@ across folds, there is a known bug in some versions of OSX where using this
 causes a race condition and the fitting will hang.  Setting `n_jobs=1` will
 disable the cross validation, at the expense of fitting the models in series.
 The parallelization has been tested on various linux boxes with no issues. See
-[this sklearn issue](htts://github.com/scikit-learn/scikit-learn/issues/636) for more
+[this sklearn issue](https://github.com/scikit-learn/scikit-learn/issues/636) for more
 information.
 
 Once the cross validation is fit, the mean out of fold deviances for each value
@@ -148,6 +148,6 @@ References
 
 * J Friedman, T Hastie, R Tibshirani (2010). ["Regularization Paths for
   Generalized Linear Models via Coordinate
-  Descent"](http://www.jtatssoft/v33/i01/paper).
+  Descent"](http://www.jstatsoft.org/v33/i01/paper).
 * J Friedman, T Hastie, H Hofling, R Tibshirani (2007). ["Pathwise Coordinate
   Optimization"](http://arxiv.org/pdf/0708.1485.pdf").
