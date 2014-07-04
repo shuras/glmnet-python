@@ -193,5 +193,5 @@ class ElasticNet(GlmNet):
             normfac = np.sum(weights)
         return np.apply_along_axis(np.sum, 0, sq_residuals) / normfac
 
-    def plot_path(self):
+    def plot_paths(self):
         self._plot_path('elastic') 

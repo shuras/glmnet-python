@@ -31,4 +31,4 @@ preds = lognet.predict(X)
 print preds[:10,np.shape(preds)[1]-1]
 print p[:10]
 
-lognet.plot_path()
+lognet.plot_paths()

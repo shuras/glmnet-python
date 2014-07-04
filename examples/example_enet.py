@@ -29,4 +29,4 @@ preds = enet.predict(X)
 print y[:10]
 print preds[:10,np.shape(preds)[1]-1]
 
-enet.plot_path()
+enet.plot_paths()

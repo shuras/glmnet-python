@@ -256,5 +256,5 @@ class LogisticNet(GlmNet):
         normfac = X.shape[0]
         return np.apply_along_axis(np.sum, 0, -2*bin_dev) / normfac
 
-    def plot_path(self):
+    def plot_paths(self):
         self._plot_path('logistic')
