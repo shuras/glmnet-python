@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import issparse, isspmatrix_csc
 import matplotlib
 import matplotlib.pyplot as plt 
 from glmnet_config import (_DEFAULT_THRESH,
@@ -141,8 +142,8 @@ class GlmNet(object):
         '''Box constraints on parameter estimates.'''
         if box_constraints is None:
             bc = np.empty((2, X.shape[1]), order='F')
-            bc[0,:] = float(-100)
-            bc[1,:] = float(100)
+            bc[0,:] = float(-10000)
+            bc[1,:] = float(10000)
             self.box_constraints = bc
         elif box_constraints.shape[1] != X.shape[1]:
             raise ValueError("Box constraints must be a vector of shape 2, "
@@ -167,6 +168,20 @@ class GlmNet(object):
             raise ValueError("Inconsistant parameters: need max_vars_all "
                              "< max_vars_largest."
                   )
+
+    @staticmethod
+    def _validate_matrix(X):
+        if issparse(X) and not isspmatrix_csc(X):
+            raise ValueError("Sparse matrix detected, but not in compressed "
+                             "sparse row format."
+                  )
+
+    @staticmethod
+    def _get_dot(X):
+        if issparse(X):
+            return X.dot.__func__
+        else:
+            return np.dot
 
     def _check_errors(self):
         '''Check for errors, documented in glmnet.f.'''
@@ -231,9 +246,10 @@ class GlmNet(object):
           Returns an n_obs * n_lambdas array, where n_obs is the number of rows
         in X.
         '''
-        return self.intercepts + np.dot(X[:, self._indicies],
+        dot = self._get_dot(X)
+        return self.intercepts + dot(X[:, self._indicies],
                                         self.coefficients
-                                 )
+                                    )
 
     def _plot_path(self, name):
         '''Plot the full regularization path of all the non-zero model

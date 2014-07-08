@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import issparse
 from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
@@ -81,7 +82,8 @@ class ElasticNet(GlmNet):
         '''
         # Predictors and response
         try:
-            X = np.asanyarray(X)
+            if not issparse(X):
+                X = np.asanyarray(X)
             y = np.asanyarray(y)
         except ValueError:
             raise ValueError("X and y must be wither numpy arrays, or "
@@ -90,13 +92,14 @@ class ElasticNet(GlmNet):
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
-        if np.isfortran(X) and not self.overwrite_pred_ok:
+        if not issparse(X) and np.isfortran(X) and not self.overwrite_pred_ok:
             X = X.copy(order='F')
         # The target array will usually be overwritten with its standardized
         # version, if this is not ok, we should copy.
         if not self.overwrite_targ_ok:
             y = y.copy()
         # Validate all the inputs:
+        self._validate_matrix(X)
         self._validate_inputs(X, y)
         self._validate_lambdas(X, y, lambdas)
         self._validate_weights(X, y, weights)
@@ -104,27 +107,60 @@ class ElasticNet(GlmNet):
         self._validate_excl_preds(X, y, excl_preds)
         self._validate_box_constraints(X, y, box_constraints)
         # Setup is complete, call the wrapper.
-        (self._out_n_lambdas,
-        self._intercepts,
-        self._comp_coef,
-        self._p_comp_coef,
-        self._n_comp_coef,
-        self.r_sqs,
-        self.out_lambdas,
-        self._n_passes,
-        self._error_flag) = _glmnet.elnet(self.alpha, 
-                                          X, 
-                                          y, 
-                                          self.weights, 
-                                          self.excl_preds, 
-                                          self.rel_penalties,
-                                          self.box_constraints,
-                                          self.max_vars_all, 
-                                          self.frac_lg_lambda, 
-                                          self.lambdas, 
-                                          self.threshold, 
-                                          nlam=self.n_lambdas
-                            )
+        if not issparse(X):
+            (self._out_n_lambdas,
+             self._intercepts,
+             self._comp_coef,
+             self._p_comp_coef,
+             self._n_comp_coef,
+             self.r_sqs,
+             self.out_lambdas,
+             self._n_passes,
+             self._error_flag) = _glmnet.elnet(
+                                     self.alpha, 
+                                     X, 
+                                     y, 
+                                     self.weights, 
+                                     self.excl_preds, 
+                                     self.rel_penalties,
+                                     self.box_constraints,
+                                     self.max_vars_all, 
+                                     self.frac_lg_lambda, 
+                                     self.lambdas, 
+                                     self.threshold, 
+                                     nlam=self.n_lambdas
+                                 )
+        else:
+            X.sort_indices()
+            # Fortran arrays are 1 indexed.
+            ind_ptrs = X.indptr + 1
+            indices = X.indices + 1
+            (self._out_n_lambdas,
+            self._intercepts,
+            self._comp_coef,
+            self._p_comp_coef,
+            self._n_comp_coef,
+            self.r_sqs,
+            self.out_lambdas,
+            self._n_passes,
+            self._error_flag) = _glmnet.spelnet(
+                                    self.alpha, 
+                                    X.shape[0],
+                                    X.shape[1],
+                                    X.data, 
+                                    ind_ptrs, 
+                                    indices,
+                                    y,
+                                    self.weights, 
+                                    self.excl_preds, 
+                                    self.rel_penalties,
+                                    self.box_constraints,
+                                    self.max_vars_all, 
+                                    self.frac_lg_lambda, 
+                                    self.lambdas, 
+                                    self.threshold, 
+                                    nlam=self.n_lambdas
+                                )
         self._check_errors()
         # Keep some model metadata
         self._n_fit_obs, self._n_fit_params = X.shape
@@ -147,20 +183,56 @@ class ElasticNet(GlmNet):
                 ]
 
     def _max_lambda(self, X, y, weights=None):
+        if issparse(X):
+            return self._max_lambda_sparse(X, y, weights)
+        else:
+            return self._max_lambda_dense(X, y, weights)
+
+
+    def _max_lambda_dense(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
         which first forces all coefficients to zero.
 
           This calculation is derived from the discussion in "Regularization 
         Paths for Generalized Linear Models via Coordinate Descent"
         '''
+        # Dense dot
+        dot = self._get_dot(X)
         X_scaled = preprocessing.scale(X)
         if weights is None:
-            dots = y.dot(X_scaled)
+            dots = dot(y, X_scaled)
             normfac = X.shape[0]
         else:
             y_wtd = y*weights
-            dots = y_wtd.dot(X_scaled)
+            dots = dot(y_wtd, X_scaled)
             normfac = np.sum(weights) 
+        # An alpha of zero (ridge) breaks the maximum lambda logic, the 
+        # coefficients are never all zero - so we readjust to a small
+        # value.
+        alpha = self.alpha if self.alpha > .0001 else .0001
+        return np.max(np.abs(dots)) / (alpha * normfac) 
+
+    def _max_lambda_sparse(self, X, y, weights=None):
+        '''To preserve the sparsity, we must avoid explicitly subtracting out
+        the mean of the columns.
+        '''
+        # Sparse dot
+        dot = self._get_dot(X)
+        # Sample expectataion value of the columns in a matrix
+        E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
+        mu = E(X)
+        mu_2 = E(X.multiply(X))
+        print mu_2 - mu*mu
+        sigma = np.sqrt(mu_2 - mu*mu)
+        # Calculating the dot product of y with X standardized, without 
+        # destorying the sparsity of X
+        if weights is None:
+            dots = 1/sigma * (dot(y, X) - mu * np.sum(y))
+            normfac = X.shape[0]
+        else:
+            y_wtd = y*weights
+            dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd))
+            normfac = np.sum(weights)
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
