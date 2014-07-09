@@ -91,6 +91,9 @@ class CVGlmNet(object):
         self.best_lambda_ind = best_lambda_ind
         self.best_lambda = best_lambda
 
+    def predict(self, X):
+        return self.base_estimator.predict(X)[:, self.best_lambda_ind].ravel()
+
     def plot_oof_devs(self):
         plt.clf()
         fig, ax = plt.subplots()
