@@ -31,6 +31,15 @@ a response vector `y`:
 enet.fit(X, y)
 ```
 
+Glmnet also accepts sparse design matricies, using the compressed sparse
+column format:
+
+```
+from scipy.sparse import csc_matrix
+Xsp = csc_matrix(X)
+enet.fit(Xsp, y)
+```
+
 After fitting, the model can be used to generate predictions on new data:
 
 ```
@@ -39,8 +48,7 @@ enet.predict(X')
 
 (Note that this generates predictions for each value of `lambda` that was 
 used in the coordinate descent algorithm).  The parameter paths can also be
-visualized, that is, the values of the model parameters for each value of 
-`lambda`:
+visualized, that is, the values of the model parameters for each `lambda`:
 
 ```
 enet.plot_paths()
@@ -51,9 +59,9 @@ enet.plot_paths()
 To select a value of `lambda` cross-validation can be used:
 
 ```
-from glmnet import ElasticNet, GlmNetCv
+from glmnet import ElasticNet, CVGlmNet
 enet = ElasticNet(alpha=.1)
-enet_cv = GlmNetCv(enet, folds=10, n_jobs=10)
+enet_cv = CVGlmNet(enet, folds=10, n_jobs=10)
 enet_cv.fit(X, y)
 ```
 
@@ -120,7 +128,6 @@ Planned Enhancements
 --------------------
 
 * Wrapper classes for the Poisson and Cox models.
-* Sparse matrix support.
 
 License
 -------
