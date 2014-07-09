@@ -678,40 +678,44 @@ python module _glmnet ! in
             integer :: nin
             real*8 dimension(nc,nt),depend(nc,nt) :: ans
         end subroutine lmodval
+
         subroutine splognet(parm,no,ni,nc,x,ix,jx,y,g,jd,vp,cl,ne,nx,nlam,flmin,ulam,thr,isd,intr,maxit,kopt,lmu,a0,ca,ia,nin,dev0,dev,alm,nlp,jerr) ! in :glmnet5:glmnet5.f
             real*8 :: parm
-            integer, optional,check(shape(y,0)==no),depend(y) :: no=shape(y,0)
-            integer, optional,check(len(vp)>=ni),depend(vp) :: ni=len(vp)
-            integer, optional,check(shape(g,1)==nc),depend(g) :: nc=shape(g,1)
+            integer :: no
+            integer :: ni
+            integer :: nc
             real*8 dimension(*) :: x
             integer dimension(*) :: ix
             integer dimension(*) :: jx
-            real*8 dimension(no,max(2,nc)),depend(nc) :: y
-            real*8 dimension(no,nc),depend(no) :: g
+            real*8 dimension(no,max(2,nc)),depend(no,nc) :: y
+            real*8 dimension(no,shape(y,1)),depend(no,y) :: g
             integer dimension(*) :: jd
-            real*8 dimension(ni) :: vp
+            real*8 dimension(ni),depend(ni) :: vp
             real*8 dimension(2,ni),depend(ni) :: cl
-            integer :: ne
-            integer, optional,check(shape(ca,0)==nx),depend(ca) :: nx=shape(ca,0)
-            integer, optional,check(len(ulam)>=nlam),depend(ulam) :: nlam=len(ulam)
+            integer optional,depend(ni,nx) :: ne=min(ni,nx)
+            integer :: nx
+            integer optional,check((flmin < 1.0 || len(ulam)<=nlam)),depend(flmin,ulam) :: nlam=len(ulam)
             real*8 :: flmin
             real*8 dimension(nlam) :: ulam
             real*8 :: thr
-            integer :: isd
-            integer :: intr
-            integer :: maxit
-            integer :: kopt
-            integer :: lmu
-            real*8 dimension(nc,nlam),depend(nc,nlam) :: a0
-            real*8 dimension(nx,nc,nlam),depend(nc,nlam) :: ca
-            integer dimension(nx),depend(nx) :: ia
-            integer dimension(nlam),depend(nlam) :: nin
-            real*8 :: dev0
-            real*8 dimension(nlam),depend(nlam) :: dev
-            real*8 dimension(nlam),depend(nlam) :: alm
-            integer :: nlp
-            integer :: jerr
+            integer optional :: isd=1 ! Standardize predictors by default
+            integer optional :: intr=1 ! Include intercept by default
+            integer optional :: maxit=100000
+            integer optional :: kopt=0 ! Use Newton's by default
+
+	    ! Outputs
+            integer intent(out) :: lmu
+            real*8 intent(out),dimension(nc,nlam),depend(nlam,nc) :: a0
+            real*8 intent(out),dimension(nx,nc,nlam),depend(nx,nc,nlam) :: ca
+            integer intent(out),dimension(nx),depend(nx) :: ia
+            integer intent(out),dimension(nlam),depend(nlam) :: nin
+            real*8 intent(out),dimension(nlam),depend(nlam) :: dev0
+            real*8 intent(out),dimension(nlam),depend(nlam) :: dev
+            real*8 intent(out),dimension(nlam),depend(nlam) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
         end subroutine splognet
+
         subroutine multsplstandard2(no,ni,x,ix,jx,w,ju,isd,intr,xm,xs,xv) ! in :glmnet5:glmnet5.f
             integer, optional,check(len(w)>=no),depend(w) :: no=len(w)
             integer, optional,check(len(ju)>=ni),depend(ju) :: ni=len(ju)

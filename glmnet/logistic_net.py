@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import issparse
 from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
@@ -94,7 +95,15 @@ class LogisticNet(GlmNet):
         '''
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
-        X = np.asanyarray(X)
+        # Convert to arrays is native python objects
+        try:
+            if not issparse(X):
+                X = np.asanyarray(X)
+            y = np.asanyarray(y)
+        except ValueError:
+            raise ValueError("X and y must be wither numpy arrays, or "
+                             "convertable to numpy arrays."
+                  )
         # Fortran expects an n_obs * n_classes array for y.  If a one 
         # dimensional array is passed, we construct an appropriate widening. 
         y = np.asanyarray(y)
@@ -115,13 +124,14 @@ class LogisticNet(GlmNet):
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
-        if np.isfortran(X) and not self.overwrite_pred_ok:
+        if not issparse(X) and np.isfortran(X) and not self.overwrite_pred_ok:
             X = X.copy(order='F')
         # The target array will usually be overwritten with its standardized
         # version, if this is not ok, we should copy.
         if np.isfortran(y) and not self.overwrite_targ_ok:
             y = y.copy(order='F')
         # Validate all the inputs:
+        self._validate_matrix(X)
         self._validate_inputs(X, y)
         self._validate_lambdas(X, y, lambdas)
         self._validate_weights(X, y, weights)
@@ -130,29 +140,62 @@ class LogisticNet(GlmNet):
         self._validate_box_constraints(X, y, box_constraints)
         self._validate_offsets(X, y, offsets)
         # Setup is complete, call the wrapper
-        (self._out_n_lambdas,
-        self._intercepts,
-        self._comp_coef,
-        self._p_comp_coef,
-        self._n_comp_coef,
-        self.null_dev,
-        self.exp_dev,
-        self.out_lambdas,
-        self._n_passes,
-        self._error_flag) = _glmnet.lognet(self.alpha, 
-                                           self.y_level_count,
-                                           X,
-                                           y, 
-                                           self.offsets,
-                                           self.excl_preds, 
-                                           self.rel_penalties,
-                                           self.box_constraints,
-                                           self.max_vars_all, 
-                                           self.frac_lg_lambda, 
-                                           self.lambdas,
-                                           self.threshold, 
-                                           nlam=self.n_lambdas
-                            )
+        if not issparse(X):
+            (self._out_n_lambdas,
+            self._intercepts,
+            self._comp_coef,
+            self._p_comp_coef,
+            self._n_comp_coef,
+            self.null_dev,
+            self.exp_dev,
+            self.out_lambdas,
+            self._n_passes,
+            self._error_flag) = _glmnet.lognet(
+                                    self.alpha, 
+                                    self.y_level_count,
+                                    X,
+                                    y, 
+                                    self.offsets,
+                                    self.excl_preds, 
+                                    self.rel_penalties,
+                                    self.box_constraints,
+                                    self.max_vars_all, 
+                                    self.frac_lg_lambda, 
+                                    self.lambdas,
+                                    self.threshold, 
+                                    nlam=self.n_lambdas
+                                )
+        else:
+            ind_ptrs = X.indptr + 1
+            indices = X.indices + 1
+            (self._out_n_lambdas,
+            self._intercepts,
+            self._comp_coef,
+            self._p_comp_coef,
+            self._n_comp_coef,
+            self.null_dev,
+            self.exp_dev,
+            self.out_lambdas,
+            self._n_passes,
+            self._error_flag) = _glmnet.splognet(
+                                    self.alpha, 
+                                    X.shape[0],
+                                    X.shape[1],
+                                    self.y_level_count,
+                                    X.data,
+                                    ind_ptrs,
+                                    indices,
+                                    y, 
+                                    self.offsets,
+                                    self.excl_preds, 
+                                    self.rel_penalties,
+                                    self.box_constraints,
+                                    self.max_vars_all, 
+                                    self.frac_lg_lambda, 
+                                    self.lambdas,
+                                    self.threshold, 
+                                    nlam=self.n_lambdas
+                                )
         self._check_errors()
         # Keep some model metadata
         self._n_fit_obs, self._n_fit_params = X.shape
@@ -223,6 +266,12 @@ class LogisticNet(GlmNet):
         scale as the weights, which causes the normalization factor to drop
         out of the equation.
         '''
+        if issparse(X):
+            return self._max_lambda_sparse(X, y, weights)
+        else:
+            return self._max_lambda_dense(X, y, weights)
+
+    def _max_lambda_dense(self, X, y, weights=None):
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
         X_scaled = preprocessing.scale(X)
@@ -234,6 +283,31 @@ class LogisticNet(GlmNet):
         # Now mimic the calculation for the quadratic case
         y_wtd = working_resp * working_weights
         dots = y_wtd.dot(X_scaled)
+        normfac = np.sum(working_weights)
+        # An alpha of zero (ridge) breaks the maximum lambda logic, the 
+        # coefficients are never all zero - so we readjust to a small
+        # value.
+        alpha = self.alpha if self.alpha > .0001 else .0001
+        return np.max(np.abs(dots)) / alpha
+
+    def _max_lambda_sparse(self, X, y, weights=None):
+        if weights is not None:
+            raise ValueError("LogisticNet cannot be fit with weights.")
+        # Sparse dot product
+        dot = self._get_dot(X)
+        # Calculation is modeled on weighted least squares
+        p = np.mean(y)
+        working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
+        working_weights = p*(1 - p) / (X.shape[0])
+        # Sample expectataion value of the columns in a matrix
+        E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
+        mu = E(X)
+        mu_2 = E(X.multiply(X))
+        sigma = np.sqrt(mu_2 - mu*mu)
+        # Calculating the dot product of y with X standardized, without 
+        # destorying the sparsity of X
+        y_wtd = working_resp * working_weights
+        dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd))
         normfac = np.sum(working_weights)
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small

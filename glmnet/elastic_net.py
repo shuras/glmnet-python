@@ -80,7 +80,7 @@ class ElasticNet(GlmNet):
           * out_lambdas: An array containing the lambda values associated with
             each fit model.
         '''
-        # Predictors and response
+        # Convert to arrays if native python objects
         try:
             if not issparse(X):
                 X = np.asanyarray(X)
@@ -222,7 +222,6 @@ class ElasticNet(GlmNet):
         E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
         mu = E(X)
         mu_2 = E(X.multiply(X))
-        print mu_2 - mu*mu
         sigma = np.sqrt(mu_2 - mu*mu)
         # Calculating the dot product of y with X standardized, without 
         # destorying the sparsity of X
