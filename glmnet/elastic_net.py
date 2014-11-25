@@ -236,6 +236,7 @@ class ElasticNet(GlmNet):
         # coefficients are never all zero - so we readjust to a small
         # value.
         alpha = self.alpha if self.alpha > .0001 else .0001
+        dots = dots[np.logical_not(np.isnan(dots))]
         return np.max(np.abs(dots)) / (alpha * normfac) 
 
     def predict(self, X):

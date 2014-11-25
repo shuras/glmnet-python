@@ -247,9 +247,12 @@ class GlmNet(object):
         in X.
         '''
         dot = self._get_dot(X)
-        return self.intercepts + dot(X[:, self._indicies],
+        if np.max(self._n_comp_coef) > 0 :
+            return self.intercepts + dot(X[:, self._indicies],
                                         self.coefficients
-                                    )
+                                        )
+        else :
+            return np.tile(self.intercepts, (X.shape[0], 1))
 
     def _plot_path(self, name):
         '''Plot the full regularization path of all the non-zero model
