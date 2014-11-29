@@ -226,14 +226,24 @@ class ElasticNet(GlmNet):
 
     def _max_lambda_dense(self, X, y, weights=None):
         dot = self._get_dot(X)
-        X_scaled = preprocessing.scale(X)
         if weights is None:
-            dots = dot(y, X_scaled)
+            # Standardize X and then find the maximum dot product.
             normfac = X.shape[0]
+            mu = X.sum(axis=0) / normfac
+            mu2 = (X*X).sum(axis=0) / normfac
+            X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
+            dots = dot(y, X_scaled)
         else:
-            y_wtd = y*weights
+            # Standardize X using the sample weights and then find the
+            # maximum weighted dot product.
+            y_wtd = y * weights
+            mu = dot(weights, X)
+            mu2 = dot(weights, X*X)
+            X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
             dots = dot(y_wtd, X_scaled)
-            normfac = np.sum(weights) 
+            # Since we included weights in the dot product we do not need
+            # to include the weight in the denominator.
+            normfac = 1
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
@@ -246,20 +256,24 @@ class ElasticNet(GlmNet):
         '''
         # Sparse dot
         dot = self._get_dot(X)
-        # Sample expectataion value of the columns in a matrix (i.e. the mean)
-        E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
-        mu = E(X)
-        mu_2 = E(X.multiply(X))
-        sigma = np.sqrt(mu_2 - mu*mu)
         # Calculate the dot product of y with X standardized, without
-        # destorying the sparsity of X
+        # destorying the sparsity of X.  The calculations themselves do not
+        # differ from the dense case.
         if weights is None:
+            E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
+            mu = E(X)
+            mu_2 = E(X.multiply(X))
+            sigma = np.sqrt(mu_2 - mu*mu)
             dots = 1/sigma * (dot(y, X) - mu * np.sum(y))
             normfac = X.shape[0]
         else:
             y_wtd = y*weights
+            E = lambda M, wts: dot(wts, M)
+            mu = E(X, weights)
+            mu_2 = E(X.multiply(X), weights)
+            sigma = np.sqrt(mu_2 - mu*mu)
             dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd))
-            normfac = np.sum(weights)
+            normfac = 1
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
