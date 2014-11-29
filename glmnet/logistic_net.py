@@ -126,6 +126,7 @@ class LogisticNet(GlmNet):
               An array containing the lambda values associated with each fit
               model.
         '''
+        self._check_if_unfit()
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
         # Convert to arrays is native python objects
@@ -283,6 +284,7 @@ class LogisticNet(GlmNet):
                   )
 
     def _logistic_coef(self):
+        self._check_if_fit()
         ccsq = np.squeeze(self._comp_coef)
         return ccsq[:np.max(self._n_comp_coef),
                     :self._out_n_lambdas

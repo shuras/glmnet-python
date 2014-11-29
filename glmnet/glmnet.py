@@ -237,9 +237,44 @@ class GlmNet(object):
             else:
                 warn("Unknown warning %d" % self._error_flag)
 
-        
+    @property
+    def intercepts(self):
+        '''The fit model intercepts, one for each value of lambda.'''
+        self._check_if_fit()
+        return self._intercepts.ravel()[:self._out_n_lambdas]
+
+    def _predict_lp(self, X):
+        '''Model predictions on a linear predictor scale.
+
+          Returns an n_obs * n_lambdas array, where n_obs is the number of rows
+        in X.
+        '''
+        self._check_if_fit()
+        dot = self._get_dot(X)
+        return self.intercepts + dot(X[:, self._indicies],
+                                        self.coefficients
+                                    )
+
+    def _plot_path(self, name):
+        '''Plot the full regularization path of all the non-zero model
+        coefficients.  Creates an displays a plot of the parameter estimates
+        at each value of log(\lambda).
+        '''
+        self._check_if_fit()
+        plt.clf()
+        fig, ax = plt.subplots()
+        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
+        for coef_path in self.coefficients:
+            ax.plot(xvals, coef_path[1:])
+        ax.set_title("Regularization paths for %s net with alpha = %s" % 
+                     (name, self.alpha))
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Parameter Value")
+        plt.show()
+
     def _str(self, name):
         '''A generic message contining data common to all glmnets.'''
+        self._check_if_fit()
         s = ("A %s net model fit on %d observations and %d parameters.     \n"
              "The model was fit in %d passes over the data.                \n"
              "There were %d values of lambda resulting in non-zero models. \n"
@@ -255,34 +290,22 @@ class GlmNet(object):
         '''Copy an unfit glmnet object.'''
         return self.__class__(**self.__dict__)
 
-    @property
-    def intercepts(self):
-        '''The fit model intercepts, one for each value of lambda.'''
-        return self._intercepts.ravel()[:self._out_n_lambdas]
-
-    def _predict_lp(self, X):
-        '''Model predictions on a linear predictor scale.
-
-          Returns an n_obs * n_lambdas array, where n_obs is the number of rows
-        in X.
+    def _is_fit(self):
+        '''The model has been fit successfully if and only if the _n_fit_obs
+        attribute exists.
         '''
-        dot = self._get_dot(X)
-        return self.intercepts + dot(X[:, self._indicies],
-                                        self.coefficients
-                                    )
+        return hasattr(self, '_n_fit_obs')
 
-    def _plot_path(self, name):
-        '''Plot the full regularization path of all the non-zero model
-        coefficients.  Creates an displays a plot of the parameter estimates
-        at each value of log(\lambda).
-        '''
-        plt.clf()
-        fig, ax = plt.subplots()
-        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
-        for coef_path in self.coefficients:
-            ax.plot(xvals, coef_path[1:])
-        ax.set_title("Regularization paths for %s net with alpha = %s" % 
-                     (name, self.alpha))
-        ax.set_xlabel("log(lambda)")
-        ax.set_ylabel("Parameter Value")
-        plt.show()
+    def _check_if_fit(self, reverse=False):
+        '''Raise exception if model is not fit.'''
+        its_ok = (not self._is_fit()) if reverse else self._is_fit()
+        word = 'already' if reverse else 'not'
+        if its_ok:
+            return
+        else:
+            raise RuntimeError('The operation cannot be performed on a model '
+                               'that has ' + word + ' been fit.'
+                  )
+
+    def _check_if_unfit(self):
+        return self._check_if_fit(reverse=True)

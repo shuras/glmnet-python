@@ -109,6 +109,7 @@ class ElasticNet(GlmNet):
               An array containing the lambda values associated with each fit
               model.
         '''
+        self._check_if_unfit()
         # Convert to arrays if native python objects
         try:
             if not issparse(X):
@@ -206,6 +207,7 @@ class ElasticNet(GlmNet):
           A _n_comp_coef * _out_n_lambdas array containing the fit model
         coefficients for each value of lambda.
         '''
+        self._check_if_fit()
         return self._comp_coef[:np.max(self._n_comp_coef),
                                :self._out_n_lambdas
                 ]
@@ -268,6 +270,7 @@ class ElasticNet(GlmNet):
         '''Calculate the normal deviance (i.e. sum of squared errors) for
         every lambda.  The model must already be fit to call this method.
         '''
+        self._check_if_fit()
         if weights is not None and weights.shape[0] != X.shape[0]:
             raise ValueError("The weights vector must have the same length "
                              "as X."
@@ -291,8 +294,10 @@ class ElasticNet(GlmNet):
         '''Produce model predictions from new data.'''
         return self._predict_lp(X)
 
+
     def plot_paths(self):
         self._plot_path('elastic') 
 
     def __str__(self):
         return self._str('elastic')
+
