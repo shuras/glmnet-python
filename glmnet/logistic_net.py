@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import issparse
+# Todo, remove dependence on sklearn, it is only used in one place.
 from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
@@ -10,18 +11,19 @@ class LogisticNet(GlmNet):
 
       This class implements the logistic net class of predictive models. These
     models combine the classical ridge and lasso regularizers into a combined
-    penalty.  More specifically, the loss function minimized by this model is:
+    penalty to the binomial deviance loss function.  More specifically, the
+    loss function minimized by this model is:
 
         L(\beta_0, \beta_1, ..., \beta_n) =
             BinDev(\beta_0, \beta_1, ..., \beta_n; X, y) + 
-            \lambda * ( (\alpha - 1)/2 * | \beta |_2 + \alpha * | \beta |_1 )
+            \lambda * ((\alpha - 1)/2 * | \beta |_2 + \alpha * | \beta |_1)
 
     where BinDev is the usual binomial deviance:
 
       BinDev(\beta_0, \beta_1, ..., \beta_n; X, y) =
        -2*sum( y*log(1 - p) + (1 - y)*log(1 - p) )
 
-    where p is formed by applying the usual logistic function to a linear
+    in which p is formed by applying the usual logistic function to a linear
     predictor.
     '''
 
@@ -32,66 +34,97 @@ class LogisticNet(GlmNet):
 
         Arguments:
 
-          * X: The predictors.  A n_obs * n_preds array.
-
+          * X: The model matrix.  A n_obs * n_preds array.
           * y: The response.  This method accepts the predictors in two
             differnt configurations:
 
             - An n_obs * n_classes array.  In this case, each column in y must
-              be a boolean flag indicating whether the observation is or is not
-              of this class.
+              be of boolean (0, 1) type indicating whether the observation is
+              or is not of a given class.
             - An n_obs array.  In this case the array must contain a discrete
               number of values, and is converted into the previous form before
               being passed to the model.
 
         Optional Arguments:
 
-          * lambdas: A user supplied list of lambdas, an elastic net will be 
-            fit for each lambda supplied.  If no array is passed, glmnet 
-            will generate its own array of lambdas.
-          * weights: An n_obs array. Observation weights.
-          * rel_penalties: An n_preds array. Relative panalty weights for the
-            covariates.  If none is passed, all covariates are penalized 
-            equally.  If an array is passed, then a zero indicates an 
-            unpenalized parameter, and a 1 a fully penalized parameter.
-          * excl_preds: An n_preds array, used to exclude covaraites from 
-            the model. To exclude predictors, pass an array with a 1 in the 
-            first position, then a 1 in the i+1st position excludes the ith 
-            covaraite from model fitting.
-          * box_constraints: An array with dimension 2 * n_obs. Interval 
-            constraints on the fit coefficients.  The (0, i) entry
-            is a lower bound on the ith covariate, and the (1, i) entry is
-            an upper bound.
-          * offsets: A n_preds * n_classes array. Used as initial offsets for
-            the model fitting. 
+          * lambdas: 
+              A user supplied list of lambdas, an elastic net will be fit for
+              each lambda supplied.  If no array is passed, glmnet will generate
+              its own array of lambdas equally spaced on a logaritmic scale 
+              between \lambda_max and \lambda_min.
+          * weights: 
+               An n_obs array. Sample weights. It is an error to pass a weights
+               array to a logistic model.
+          * rel_penalties: 
+              An n_preds array. Relative panalty weights for the covariates.  If
+              none is passed, all covariates are penalized equally.  If an array
+              is passed, then a zero indicates an unpenalized parameter, and a 1
+              a fully penalized parameter.  Otherwise all covaraites recieve an
+              equal penalty.
+          * excl_preds: 
+              An n_preds array, used to exclude covaraites from the model. To
+              exclude predictors, pass an array with a 1 in the first position,
+              then a 1 in the i+1st position excludes the ith covaraite from
+              model fitting.  If no array is passed, all covaraites in X are 
+              included in the model.
+          * box_constraints: 
+              An array with dimension 2 * n_obs. Interval constraints on the fit
+              coefficients.  The (0, i) entry is a lower bound on the ith
+              covariate, and the (1, i) entry is an upper bound.  These must 
+              satisfy lower_bound <= 0 <= upper_bound.  If no array is passed,
+              no box constraintes are allied to the parameters.
+          * offsets: 
+              A n_preds * n_classes array. Used as initial offsets for the
+              model fitting. 
 
         After fitting, the following attributes are set:
         
         Private attributes:
 
-          * _out_n_lambdas: The number of fit lambdas associated with non-zero
-            models; for large enough lambdas the models will become zero in the
-            presense of an L1 regularizer.
-          * _comp_coef: The fit coefficients in a compressed form.  Only
-            coefficients that are non-zero for some lambda are reported, and the
-            associated between these parameters and the predictors are given by
-            the _p_comp_coef attribute.
-          * _p_comp_coef: An array associating the coefficients in _comp_coef to
-            columns in the predictor array. 
-          * _indicies: The same information as _p_comp_coef, but zero indexed to
-            be compatable with numpy arrays.
-          * _n_comp_coef: The number of coefficients that are non-zero for some
-            value of lambda.
-          * _n_passes: The total number of passes over the data used to fit the
-            model.
-          * _error_flag: Error flag from the fortran code.
+          * _n_fit_obs:
+              The number of rows in the model matrix X.
+          * _n_fit_params:
+              The number of columns in the model matrix X.
+          * _out_n_lambdas: 
+              The number of lambdas associated with non-zero models (i.e.
+              models with at least one none zero parameter estiamte) after
+              fitting; for large enough lambda the models will become zero in
+              the presense of an L1 regularizer.
+          * _intecepts: 
+              A one dimensional array containing the intercept estiamtes for
+              each value of lambda.  See the intercepts (no underscore) 
+              property for a public version.
+          * _comp_coef: 
+              The fit parameter estiamtes in a compressed form.  This is a
+              matrix with each row giving the estimates for a single
+              coefficient for various values of \lambda.  The order of the rows
+              does not correspond to the order of the coefficents as given in
+              the design matrix used to fit the model, this association is
+              given by the _p_comp_coef attribute.  Only estaimtes that are
+              non-zero for some lambda are reported.
+          * _p_comp_coef: 
+              A one dimensional integer array associating the coefficients in
+              _comp_coef to columns in the model matrix. 
+          * _indicies: 
+              The same information as _p_comp_coef, but zero indexed to be
+              compatable with numpy arrays.
+          * _n_comp_coef: 
+              The number of parameter estimates that are non-zero for some
+              value of lambda.
+          * _n_passes: 
+              The total number of passes over the data used to fit the model.
+          * _error_flag: 
+              Error flag from the fortran code.
 
         Public Attributes:
           
-          * null_dev: The devaince of the null model.
-          * exp_dev: The devaince explained by the model.
-          * out_lambdas: An array containing the lambda values associated with
-            each fit model.
+          * null_dev: 
+              The devaince of the null (mean) model.
+          * exp_dev: 
+              The devaince explained by the model.
+          * out_lambdas: 
+              An array containing the lambda values associated with each fit
+              model.
         '''
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
@@ -108,6 +141,8 @@ class LogisticNet(GlmNet):
         # dimensional array is passed, we construct an appropriate widening. 
         y = np.asanyarray(y)
         if len(y.shape) == 1:
+            # TODO: Implement an n_classes attribute.  I'm not sure this
+            # even works as intended.
             self.logistic = True
             y_classes = np.unique(y)
             y = np.float64(np.column_stack(y == c for c in y_classes))
@@ -117,6 +152,8 @@ class LogisticNet(GlmNet):
         y_level_count = y.shape[1]
         # Two class predictions are handled as a special case, as is usual 
         # with logistic models
+        # TODO: Why is this stored as an attribute?  Its never used outside
+        #       of this method.
         if y_level_count == 2:
             self.y_level_count = np.array([1])
         else:
@@ -126,8 +163,8 @@ class LogisticNet(GlmNet):
         # copied anyway.
         if not issparse(X) and np.isfortran(X) and not self.overwrite_pred_ok:
             X = X.copy(order='F')
-        # The target array will usually be overwritten with its standardized
-        # version, if this is not ok, we should copy.
+        # Make a copy if we are not able to overwrite y with its standardized
+        # version.
         if np.isfortran(y) and not self.overwrite_targ_ok:
             y = y.copy(order='F')
         # Validate all the inputs:
@@ -166,8 +203,11 @@ class LogisticNet(GlmNet):
                                     nlam=self.n_lambdas
                                 )
         else:
+            X.sort_indices()
+            # Fortran arrays are 1 indexed.
             ind_ptrs = X.indptr + 1
             indices = X.indices + 1
+            # Call
             (self._out_n_lambdas,
             self._intercepts,
             self._comp_coef,
@@ -200,11 +240,14 @@ class LogisticNet(GlmNet):
         # Keep some model metadata
         self._n_fit_obs, self._n_fit_params = X.shape
         # The indexes into the predictor array are off by one due to fortran
-        # convention, fix it up.
+        # convention differing from numpys, this make them indexes into the the
+        # numpy array. 
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
 
     def _validate_offsets(self, X, y, offsets):
         '''If no explicit offset was setup, we assume a zero offset.'''
+        # TODO: Allow for passing a one-dim array of offsets in the two 
+        # class case.
         if offsets is None:
             self.offsets = np.zeros((X.shape[0], y.shape[1]), order='F')
         else:
@@ -212,12 +255,9 @@ class LogisticNet(GlmNet):
         if (self.offsets.shape[0] != X.shape[0] or
             self.offsets.shape[1] != y.shape[1]):
             raise ValueError("Offsets must share its first dimenesion with X "
-                             "and its second dimenstion must be the number of "
+                             "and its second dimension must be the number of "
                              "response classes."
                   )
-
-    def __str__(self):
-        return self._str('logistic')
 
     @property
     def coefficients(self):
@@ -226,12 +266,14 @@ class LogisticNet(GlmNet):
           The dimensions of this array depend on whether of not a two class
         response was used (i.e. was logistic regression performed):
 
-          * If so: A _n_comp_coef * _out_n_lambdas array containing the fit 
-            model coefficients for each value of lambda.
+          * If so: 
+              A _n_comp_coef * _out_n_lambdas array containing the fit model
+              coefficients for each value of lambda.
 
-          * If not: A _n_comp_coef * n_classes * _out_n_lambdas array containing
-            the model coefficients for each level of the response, for each
-            lambda.
+          * If not: 
+              A _n_comp_coef * n_classes * _out_n_lambdas array containing the
+              model coefficients for each level of the response, for each
+              lambda.
         '''
         if self.logistic:
             return self._logistic_coef()
@@ -253,11 +295,19 @@ class LogisticNet(GlmNet):
           This calculation is derived from the discussion in "Regularization 
         Paths for Generalized Linear Models via Coordinate Descent" in the 
         section "Regularized Logistic Regression", using an analogy with the 
-        linear case with weighted samples.  We take the initial coefficients 
-        to be:
+        linear case with weighted samples.  
+        
+          We apply the reasoning from the linear case to a quadratic 
+        approximation to the binomial likelihood evaluated at an initial 
+        value of the parameters.  The initial parameters are taken to be:
+
             \beta_0 = log(p/(1-p))
             \beta_i = 0
-        I.e., our initial model is the intercept only model.
+
+        I.e., our initial model is the intercept only model.  Comapring the
+        approximation to the elastic net case gives us a working response and
+        working weights.  These are used in the formula giving the maximum
+        lambda in the elastic net.
         
            There is one complication: the working weights in the quadratic 
         approximation to the logistic loss are not normalized, while the 
@@ -283,7 +333,6 @@ class LogisticNet(GlmNet):
         # Now mimic the calculation for the quadratic case
         y_wtd = working_resp * working_weights
         dots = y_wtd.dot(X_scaled)
-        normfac = np.sum(working_weights)
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
@@ -291,6 +340,9 @@ class LogisticNet(GlmNet):
         return np.max(np.abs(dots)) / alpha
 
     def _max_lambda_sparse(self, X, y, weights=None):
+        '''To preserve the sparsity, we must avoid explicitly subtracting out
+        the mean of the columns.
+        '''
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
         # Sparse dot product
@@ -308,19 +360,16 @@ class LogisticNet(GlmNet):
         # destorying the sparsity of X
         y_wtd = working_resp * working_weights
         dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd))
-        normfac = np.sum(working_weights)
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
         alpha = self.alpha if self.alpha > .0001 else .0001
         return np.max(np.abs(dots)) / alpha
 
-    def predict(self, X):
-        '''Return model predictions on the probability scale.'''
-        return 1 / ( 1 + np.exp(self._predict_lp(X)) )
-
     def deviance(self, X, y):
-        '''Calculate the binomial deviance for every lambda.'''
+        '''Calculate the binomial deviance for every lambda. The model must
+        already be fit to call this method.
+        '''
         y_hat = self.predict(X)
         # Take the response y, and repeat it as a column to produce a matrix
         # of the same dimensions as y_hat
@@ -330,5 +379,12 @@ class LogisticNet(GlmNet):
         normfac = X.shape[0]
         return np.apply_along_axis(np.sum, 0, -2*bin_dev) / normfac
 
+    def predict(self, X):
+        '''Return model predictions on the probability scale.'''
+        return 1 / ( 1 + np.exp(self._predict_lp(X)) )
+
     def plot_paths(self):
         self._plot_path('logistic')
+
+    def __str__(self):
+        return self._str('logistic')
