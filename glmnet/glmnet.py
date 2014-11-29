@@ -52,7 +52,6 @@ class GlmNet(object):
 
     def __init__(self, 
                  alpha, 
-                 offsets=None,
                  standardize=True,
                  max_vars_all=None,
                  max_vars_largest=None,
