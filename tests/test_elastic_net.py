@@ -170,6 +170,10 @@ class TestElasticNet(unittest.TestCase):
         with self.assertRaises(ValueError):
             sw = np.ones(shape=(10,))
             enet.fit(X, y, weights=sw)
+        with self.assertRaises(ValueError):
+            sw = np.ones(shape=(50,))
+            sw[25] = -1
+            enet.fit(X, y, weights=sw)
 
     def test_validate_rel_penalties(self):
         X = np.random.random(size=(50,10))

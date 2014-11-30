@@ -127,6 +127,8 @@ class GlmNet(object):
             raise ValueError("The weights vector must have the same length "
                              "as X."
                   )
+        if np.any(self.weights < 0):
+            raise ValueError("All sample weights must be non-negative.")
 
     def _validate_rel_penalties(self, X, y, rel_penalties):
         '''If no explicit penalty weights are passed, each varaible is given the
