@@ -222,3 +222,13 @@ class TestElasticNet(unittest.TestCase):
         with self.assertRaises(ValueError):
            box_const = np.empty(shape=(1,10))
            enet.fit(X, y, box_constraints=box_const)
+        with self.assertRaises(ValueError):
+           box_const = np.empty(shape=(2,10))
+           box_const[0,:] = -1; box_const[1,:] = 1
+           box_const[0,5] = 1
+           enet.fit(X, y, box_constraints=box_const)
+        with self.assertRaises(ValueError):
+           box_const = np.empty(shape=(2,10))
+           box_const[0,:] = -1; box_const[1,:] = 1
+           box_const[1,5] = -1
+           enet.fit(X, y, box_constraints=box_const)

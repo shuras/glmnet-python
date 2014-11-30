@@ -169,10 +169,16 @@ class GlmNet(object):
             bc[0,:] = float("-inf")
             bc[1,:] = float("inf")
             box_constraints = bc
-        elif (box_constraints.shape[1] != X.shape[1] or 
+        if (box_constraints.shape[1] != X.shape[1] or 
               box_constraints.shape[0] != 2):
             raise ValueError("Box constraints must be a vector of shape 2, "
                             "number of columns in X."
+                  )
+        if (np.any(box_constraints[0,:] > 0) or
+            np.any(box_constraints[1,:] < 0)):
+            raise ValueError("Box constraints must be intervals of the form "
+                             "[non-positive, non-negative] for each "
+                             "predictor."
                   )
         self.box_constraints = box_constraints.copy(order='F')
 
