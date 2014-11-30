@@ -353,7 +353,7 @@ class ElasticNet(GlmNet):
         '''Plot parameter estiamte paths by log(lambda).'''
         self._plot_path('elastic') 
 
-    def __str__(self, lidx=None):
+    def __str__(self):
         return self._str('elastic')
 
     def describe(self, lidx=None):
@@ -363,8 +363,8 @@ class ElasticNet(GlmNet):
         '''
         if not self._is_fit():
             display_str = "An unfit elastic net model."
-        display_str = self.__str__()
         else:
+            display_str = self.__str__()
             if lidx != None:
                 sep = '-'*79 + '\n'
                 display_str = display_str + sep + self._coef_str(lidx)
