@@ -23,7 +23,7 @@ class ElasticNet(GlmNet):
     '''
 
     # TODO: Implement offsets.
-    def fit(self, X, y,
+    def fit(self, X, y, col_names=None,
             lambdas=None, weights=None, rel_penalties=None,
             excl_preds=None, box_constraints=None):
         '''Fit an elastic net model.
@@ -69,6 +69,9 @@ class ElasticNet(GlmNet):
               The number of rows in the model matrix X.
           * _n_fit_params:
               The number of columns in the model matrix X.
+          * _col_names:
+              Names for the columns in the model matrix.  Used to display fit 
+              coefficients.
           * _out_n_lambdas: 
               The number of lambdas associated with non-zero models (i.e.
               models with at least one none zero parameter estiamte) after
@@ -193,12 +196,25 @@ class ElasticNet(GlmNet):
                                     nlam=self.n_lambdas
                                 )
         self._check_errors()
-        # Keep some model metadata
-        self._n_fit_obs, self._n_fit_params = X.shape
         # The indexes into the predictor array are off by one due to fortran
         # convention differing from numpys, this make them indexes into the the
         # numpy array. 
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
+        # Keep some model metadata.
+        self._n_fit_obs, self._n_fit_params = X.shape
+        # Create a list of column names for the fit parameters, these can be
+        # passed in, or attached to the matrix from patsy.  If none are found
+        # we crate our own stupid ones.
+        if col_names != None:
+           self._col_names = col_names
+        # Model matrix generated from patsy.
+        elif hasattr(X, 'design_info'):
+            self._col_names = X.design_info.column_names
+        else:
+            self._col_names = [
+                'var_' + str(i) for i in range(self._n_fit_params)
+            ]
+               
 
     @property
     def _coefficients(self):
