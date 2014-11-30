@@ -349,9 +349,41 @@ class ElasticNet(GlmNet):
         '''Produce model predictions from new data.'''
         return self._predict_lp(X)
 
-
     def plot_paths(self):
+        '''Plot parameter estiamte paths by log(lambda).'''
         self._plot_path('elastic') 
 
-    def __str__(self):
+    def __str__(self, lidx=None):
         return self._str('elastic')
+
+    def describe(self, lidx=None):
+        '''Display information about the model.  Behaviour depends on 
+        state of the model when called, and whether a specific lambda index
+        is passed.
+        '''
+        if not self._is_fit():
+            display_str = "An unfit elastic net model."
+        display_str = self.__str__()
+        else:
+            if lidx != None:
+                sep = '-'*79 + '\n'
+                display_str = display_str + sep + self._coef_str(lidx)
+        return display_str
+
+    def _coef_str(self, lidx):
+        '''Creat a string containing a table of coefficient estimates for
+        a given value of lambda.
+        '''
+        lam = self.out_lambdas[lidx]
+        coefs = self.get_coefficients_from_lambda_idx(lidx)
+        title = ("Parameter Estiamtes for elastic net model with "
+                 "lambda = {lam:1.5e}\n").format(lam=lam)
+        header = "{nameh:<40}{valh:<10}\n".format(
+            nameh="Varaible Name", valh="Coefficent Estiamte"
+        )
+        line_template = "{name:<40}{val:1.5e}"
+        body = "\n".join(
+            line_template.format(name=self._col_names[i], val=coefs[i])
+            for i in range(self._n_fit_params)
+        )
+        return title + header + body
