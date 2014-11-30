@@ -157,14 +157,15 @@ class GlmNet(object):
         '''Box constraints on parameter estimates.'''
         if box_constraints is None:
             bc = np.empty((2, X.shape[1]), order='F')
-            bc[0,:] = float(-10000)
-            bc[1,:] = float(10000)
-            self.box_constraints = bc
-        elif box_constraints.shape[1] != X.shape[1]:
+            bc[0,:] = float("-inf")
+            bc[1,:] = float("inf")
+            box_constraints = bc
+        elif (box_constraints.shape[1] != X.shape[1] or 
+              box_constraints.shape[0] != 2):
             raise ValueError("Box constraints must be a vector of shape 2, "
                             "number of columns in X."
                   )
-        self.box_constraints = self.box_constraints.copy(order='F')
+        self.box_constraints = box_constraints.copy(order='F')
 
     def _validate_inputs(self, X, y):
         '''Validate and process the prectors and response for model fitting.'''
