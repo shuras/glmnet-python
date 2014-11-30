@@ -141,6 +141,8 @@ class GlmNet(object):
             raise ValueError("The relative penalties vector must have the "
                              "same length as the number of columns in X."
                   )
+        if np.any(self.rel_penalties < 0):
+            raise ValueError("All relative penalties must be non-negative.")
 
     def _validate_excl_preds(self, X, y, excl_preds):
         '''If no explicit exclusion is supplied, pass a zero to exclude nothing.
@@ -149,10 +151,15 @@ class GlmNet(object):
                                        else excl_preds
                           )
         if self.excl_preds.shape[0] != 1:
-            if self.excl_preds.shape[0] != X.shape[1]:
+            if self.excl_preds.shape[0] > X.shape[1] + 1:
                 raise ValueError("Non null excluded predictors array must "
-                                 "have the same length as the number of "
+                                 "have less entries than the number of "
                                  "columns in X."
+                      )
+            if np.any(self.excl_preds[1:] >= X.shape[1]):
+                raise ValueError("Entries in non null excluded predictors "
+                                 "array (except for the first entry) must "
+                                 "enumerate columns in X."
                       )
 
     def _validate_box_constraints(self, X, y, box_constraints):

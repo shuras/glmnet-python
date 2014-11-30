@@ -186,6 +186,10 @@ class TestElasticNet(unittest.TestCase):
         with self.assertRaises(ValueError):
             rel_pens = np.ones(shape=(50,))
             enet.fit(X, y, rel_penalties=rel_pens)
+        with self.assertRaises(ValueError):
+            rel_pens = np.ones(shape=(10,))
+            rel_pens[5] = -1
+            enet.fit(X, y, rel_penalties=rel_pens)
 
     def test_validate_excl_preds(self):
         X = np.random.random(size=(50,10))
@@ -193,10 +197,15 @@ class TestElasticNet(unittest.TestCase):
         y = np.dot(X, w)
         enet = ElasticNet(alpha=.5)
         with self.assertRaises(ValueError):
-            excl_preds = np.ones(shape=(9,))
+            excl_preds = np.ones(shape=(12,))
             enet.fit(X, y, excl_preds=excl_preds)
         with self.assertRaises(ValueError):
             excl_preds = np.ones(shape=(50,))
+            enet.fit(X, y, excl_preds=excl_preds)
+        with self.assertRaises(ValueError):
+            excl_preds = np.ones(shape=(11,))
+            excl_preds[0] = 1
+            excl_preds[5] = 10
             enet.fit(X, y, excl_preds=excl_preds)
 
     def test_validate_box_constraints(self):
