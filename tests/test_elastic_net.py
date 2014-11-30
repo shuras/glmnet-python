@@ -1,6 +1,6 @@
 from glmnet import ElasticNet
 import numpy as np
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, csr_matrix
 import unittest
 
 np.random.seed(123)
@@ -138,17 +138,74 @@ class TestElasticNet(unittest.TestCase):
                     max_lambda_from_fortran, max_lambda_from_python, 4
                 )
 
-    def test_lasso_withrel_penalties(self):
+    def test_validate_matrix(self):
         Xdn = np.random.random(size=(50,10))
-        Xsp = csc_matrix(Xdn)
-        w = np.ones(shape=(10,))
+        w = np.random.random(size=(10,))
         y = np.dot(Xdn, w)
-        for i in range(1, 10):
-            for X in (Xdn, Xsp):
-                penalties = np.ones(shape=(10,)) / 1000
-                penalties[i] = 1
-                enet = ElasticNet(alpha=1)
-                enet.fit(X, y, lambdas=[16], rel_penalties=penalties)
-                coef = enet.coefficients.ravel()
-                # TODO: Not sure how to write this test.  Seems to work fine
-                # when eyeballing it.  I'll come back to this.
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+            Xsp = csr_matrix(Xdn)
+            enet.fit(Xsp, y)
+
+    def test_validate_inputs(self):
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+            yprime = y.copy()[:49]
+            enet.fit(X, yprime)
+        with self.assertRaises(ValueError):
+            yprime = np.random.random(size=(10,))
+            enet.fit(X, yprime)
+
+    def test_validate_weights(self):
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+            sw = np.ones(shape=(49,))
+            enet.fit(X, y, weights=sw)
+        with self.assertRaises(ValueError):
+            sw = np.ones(shape=(10,))
+            enet.fit(X, y, weights=sw)
+
+    def test_validate_rel_penalties(self):
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+            rel_pens = np.ones(shape=(9,))
+            enet.fit(X, y, rel_penalties=rel_pens)
+        with self.assertRaises(ValueError):
+            rel_pens = np.ones(shape=(50,))
+            enet.fit(X, y, rel_penalties=rel_pens)
+
+    def test_validate_excl_preds(self):
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+            excl_preds = np.ones(shape=(9,))
+            enet.fit(X, y, excl_preds=excl_preds)
+        with self.assertRaises(ValueError):
+            excl_preds = np.ones(shape=(50,))
+            enet.fit(X, y, excl_preds=excl_preds)
+
+    def test_validate_box_constraints(self):
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.5)
+        with self.assertRaises(ValueError):
+           box_const = np.empty(shape=(2,50))
+           enet.fit(X, y, box_constraints=box_const)
+        with self.assertRaises(ValueError):
+           box_const = np.empty(shape=(10,2))
+           enet.fit(X, y, box_constraints=box_const)
+        with self.assertRaises(ValueError):
+           box_const = np.empty(shape=(1,10))
+           enet.fit(X, y, box_constraints=box_const)
