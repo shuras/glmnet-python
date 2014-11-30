@@ -268,7 +268,7 @@ class GlmNet(object):
         self._check_if_fit()
         dot = self._get_dot(X)
         return self.intercepts + dot(X[:, self._indicies],
-                                        self.coefficients
+                                        self._coefficients
                                     )
 
     def _plot_path(self, name):
@@ -280,7 +280,7 @@ class GlmNet(object):
         plt.clf()
         fig, ax = plt.subplots()
         xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
-        for coef_path in self.coefficients:
+        for coef_path in self._coefficients:
             ax.plot(xvals, coef_path[1:])
         ax.set_title("Regularization paths for %s net with alpha = %s" % 
                      (name, self.alpha))

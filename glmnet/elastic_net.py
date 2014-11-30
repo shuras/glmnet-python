@@ -201,7 +201,7 @@ class ElasticNet(GlmNet):
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
 
     @property
-    def coefficients(self):
+    def _coefficients(self):
         '''The fit model coefficients for each lambda.
 
           A _n_comp_coef * _out_n_lambdas array containing the fit model
@@ -314,4 +314,3 @@ class ElasticNet(GlmNet):
 
     def __str__(self):
         return self._str('elastic')
-

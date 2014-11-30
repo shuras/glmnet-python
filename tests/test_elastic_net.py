@@ -26,7 +26,7 @@ class TestElasticNet(unittest.TestCase):
                 enet.fit(X, y, lambdas=[0])
                 test_preds = np.allclose(enet.predict(X).ravel(), y, atol=.01)
                 self.assertTrue(test_preds)
-                test_coefs = np.allclose(enet.coefficients.ravel(), w, atol=.02)
+                test_coefs = np.allclose(enet._coefficients.ravel(), w, atol=.02)
                 self.assertTrue(test_coefs)
 
     def test_lasso_models(self):
@@ -46,7 +46,7 @@ class TestElasticNet(unittest.TestCase):
                 y = np.dot(Xdn, w_masked)
                 enet = ElasticNet(alpha=1)
                 enet.fit(X, y, lambdas=[.01])
-                test = (len(enet.coefficients.ravel() == w_mask))
+                test = (len(enet._coefficients.ravel() == w_mask))
                 self.assertTrue(test)
 
     def test_unregularized_with_weights(self):
@@ -68,7 +68,7 @@ class TestElasticNet(unittest.TestCase):
                 enet.fit(X, y, lambdas=[0], weights=sw)
                 test_preds = np.allclose(enet.predict(X).ravel(), y, atol=.01)
                 self.assertTrue(test_preds)
-                test_coefs = np.allclose(enet.coefficients.ravel(), w, atol=.02)
+                test_coefs = np.allclose(enet._coefficients.ravel(), w, atol=.02)
                 self.assertTrue(test_coefs)
 
     def test_lasso_with_weights(self):
@@ -91,7 +91,7 @@ class TestElasticNet(unittest.TestCase):
                 y = np.dot(Xdn, w_masked)
                 enet = ElasticNet(alpha=1)
                 enet.fit(X, y, lambdas=[.01], weights=sw)
-                test = (len(enet.coefficients.ravel() == w_mask))
+                test = (len(enet._coefficients.ravel() == w_mask))
                 self.assertTrue(test)
 
     def test_max_lambda(self):
