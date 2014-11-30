@@ -228,6 +228,31 @@ class ElasticNet(GlmNet):
                                :self._out_n_lambdas
                 ]
 
+    def get_coefficients_from_lambda_idx(self, lidx):
+        '''Get the array of coefficient estimates given an index into the
+        array of fit lambdas, that is, for a fixed lambda (index) return the
+        estimates of the various coefficients given lambda.
+
+          An array of length _n_fit_params (i.e. X.shape[1]).
+        '''
+        coefs = np.zeros(shape=(self._n_fit_params,))
+        coefs[self._indicies] = self._coefficients[:,lidx]
+        return coefs
+
+    def get_coefficients_from_col_idx(self, cidx):
+        '''Get the array of coefficient estimates given the index of a 
+        column in the model matrix, that is, for a fixed column return all the
+        various estimates of the associated coefficient across lambda.  Returns
+        the zero array if the coefficient is compressed out of _coefficients.
+
+          An array of length _out_n_lambdas.
+        '''
+        if cidx not in self._indicies:
+            return np.zeros(shape=(self._out_n_lambdas,))
+        else:
+           ridx = np.where(self._indicies == cidx)
+           return self._coefficients[ridx,:].squeeze()
+
     def _max_lambda(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
         which first forces all coefficients to zero.
