@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.sparse import issparse
-from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
 
@@ -215,7 +214,6 @@ class ElasticNet(GlmNet):
                 'var_' + str(i) for i in range(self._n_fit_params)
             ]
                
-
     @property
     def _coefficients(self):
         '''The fit model coefficients for each lambda.
