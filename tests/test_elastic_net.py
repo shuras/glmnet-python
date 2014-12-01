@@ -10,11 +10,11 @@ class TestElasticNet(unittest.TestCase):
 
     def test_unregularized_models(self):
         '''Test that fitting an unregularized model (lambda=0) gives
-        expected results.
+        expected results for both dense and sparse model matricies.
         
-          For both dense and sparse design matricies, we test that an 
-        unregularized model captures a perfect linear relationship without
-        error.
+          We test that an unregularized model captures a perfect linear
+        relationship without error.  That is, the fit parameters equals the
+        true coefficients.
         '''
         Xdn = np.random.random(size=(50,10))
         Xsp = csc_matrix(Xdn)
@@ -30,11 +30,13 @@ class TestElasticNet(unittest.TestCase):
                 self.assertTrue(test_coefs)
 
     def test_lasso_models(self):
-        '''Test that a pure lasso (alpha=1) model gives expected results.        
+        '''Test that a pure lasso (alpha=1) model gives expected results
+        for both dense and sparse design matricies.        
         
-          For both dense and sparse design matricies we test that a lasso
-        model can pick out zero parameters from an otherwise perfect linear 
-        relationship.
+          We test that the lasso model has the ability to pick out zero 
+        parameters from a linear relationship.  To see this, we generate 
+        linearly related data were some number of the coefficients are
+        exactly zero, and make sure the lasso model can pick these out.
         '''
         Xdn = np.random.random(size=(50,10))
         Xsp = csc_matrix(Xdn)
@@ -49,13 +51,38 @@ class TestElasticNet(unittest.TestCase):
                 test = (len(enet._coefficients.ravel() == w_mask))
                 self.assertTrue(test)
 
+    def test_ridge_models(self):
+        '''Test that a pure ridge (alpha=0) model gives expected results
+        for both dense and sparse matricies.
+
+          We test that the ridge model, when fit on uncorrelated predictors,
+        shrinks the parameter estiamtes uniformly.  To see this, we generate
+        linearly related data with a correlation free model matrix, then test
+        that the array of ratios of fit parameters to true coefficients is 
+        a constant array.
+        
+        This test generates more samples than the others to guarentee that the
+        data is sufficiently correlation free, otherwise the effect to be 
+        measured does not occur.
+        '''
+        Xdn = np.random.random(size=(10000,3))
+        Xsp = csc_matrix(Xdn)
+        w = np.random.random(size=(3,))
+        for X in (Xdn, Xsp):
+            for lam in np.linspace(0, 1, 10):
+                y = np.dot(Xdn, w)
+                enet = ElasticNet(alpha=0)
+                enet.fit(X, y, lambdas=[lam])
+                ratios = enet._coefficients.ravel() / w
+                norm_ratios = ratios / np.max(ratios)
+                test = np.allclose(
+                    norm_ratios, 1, atol=.05
+                )
+                self.assertTrue(test)
+
     def test_unregularized_with_weights(self):
         '''Test that fitting an unregularized model (lambda=0) gives expected
         results when sample weights are used.
-        
-          For both dense and sparse dsign matricies, we test that an
-        unregularized model captures a perfect linear relationship without
-        error.
         '''
         Xdn = np.random.random(size=(50,10))
         Xsp = csc_matrix(Xdn)
@@ -74,10 +101,6 @@ class TestElasticNet(unittest.TestCase):
     def test_lasso_with_weights(self):
         '''Test that a pure lasso (alpha=1) model gives expected results when
         sample weights are used.        
-        
-          For both dense and sparse design matricies we test that a lasso
-        model can pick out zero parameters from an otherwise perfect linear 
-        relationship.
         '''
         Xdn = np.random.random(size=(50,10))
         Xsp = csc_matrix(Xdn)
@@ -92,6 +115,27 @@ class TestElasticNet(unittest.TestCase):
                 enet = ElasticNet(alpha=1)
                 enet.fit(X, y, lambdas=[.01], weights=sw)
                 test = (len(enet._coefficients.ravel() == w_mask))
+                self.assertTrue(test)
+
+    def test_ridge_with_weights(self):
+        '''Test that a pure ridge (alpha=0) model gives expected results
+        for both dense and sparse matricies.
+        '''
+        Xdn = np.random.random(size=(10000,3))
+        Xsp = csc_matrix(Xdn)
+        w = np.random.random(size=(3,))
+        sw = np.random.uniform(size=(10000,))
+        sw = sw / np.sum(sw)
+        for X in (Xdn, Xsp):
+            for lam in np.linspace(0, 1, 10):
+                y = np.dot(Xdn, w)
+                enet = ElasticNet(alpha=0)
+                enet.fit(X, y, lambdas=[lam], weights=sw)
+                ratios = enet._coefficients.ravel() / w
+                norm_ratios = ratios / np.max(ratios)
+                test = np.allclose(
+                    norm_ratios, 1, atol=.05
+                )
                 self.assertTrue(test)
 
     def test_max_lambda(self):

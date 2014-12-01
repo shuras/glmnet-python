@@ -36,6 +36,26 @@ class TestLogisticNet(unittest.TestCase):
                    np.sum(np.abs(lc / np.max(np.abs(lc))) > .05) == w_mask
                 )
 
+    def test_ridge_models(self):
+        Xdn = np.random.uniform(-1, 1, size=(10000,3))
+        Xsp = csc_matrix(Xdn)
+        w = (np.random.uniform(-1, 1, size=(3,)) >= 0).astype(int) - .5
+        for X in (Xdn, Xsp):
+            for lam in np.linspace(.1, 1, 10):
+                y = (np.dot(Xdn, w) >= 0).astype(int)
+                lnet = LogisticNet(alpha=0)
+                lnet.fit(X, y, lambdas=[lam])
+                print lnet._coefficients
+                print w
+                ratios = lnet._coefficients.ravel() / w
+                norm_ratios = ratios / np.max(ratios)
+                print norm_ratios
+                test = np.allclose(
+                    norm_ratios, 1, atol=.05
+                )
+                self.assertTrue(test)
+
+
     def test_max_lambda(self):
         Xdn = np.random.uniform(-1, 1, size=(50,10))
         Xsp = csc_matrix(Xdn)
