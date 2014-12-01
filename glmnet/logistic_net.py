@@ -1,7 +1,5 @@
 import numpy as np
 from scipy.sparse import issparse
-# Todo, remove dependence on sklearn, it is only used in one place.
-from sklearn import preprocessing
 import _glmnet
 from glmnet import GlmNet
 
@@ -35,7 +33,7 @@ class LogisticNet(GlmNet):
         Arguments:
 
           * X: The model matrix.  A n_obs * n_preds array.
-          * y: The response.  This method accepts the predictors in two
+          * y: The response.  This method accepts the response in two
             differnt configurations:
 
             - An n_obs * n_classes array.  In this case, each column in y must
@@ -127,8 +125,7 @@ class LogisticNet(GlmNet):
               model.
         '''
         self._check_if_unfit()
-        if weights is not None:
-            raise ValueError("LogisticNet cannot be fit with weights.")
+        self._check_weights(weights)
         # Convert to arrays is native python objects
         try:
             if not issparse(X):
@@ -140,25 +137,19 @@ class LogisticNet(GlmNet):
                   )
         # Fortran expects an n_obs * n_classes array for y.  If a one 
         # dimensional array is passed, we construct an appropriate widening. 
+        # TODO: Save class names as attribute.
         y = np.asanyarray(y)
         if len(y.shape) == 1:
-            # TODO: Implement an n_classes attribute.  I'm not sure this
-            # even works as intended.
-            self.logistic = True
             y_classes = np.unique(y)
             y = np.float64(np.column_stack(y == c for c in y_classes))
-        else:
-            self.logistic = False
-        # Count the number of classes in y.
-        y_level_count = y.shape[1]
+        self._n_classes = y.shape[1]
         # Two class predictions are handled as a special case, as is usual 
-        # with logistic models
-        # TODO: Why is this stored as an attribute?  Its never used outside
-        #       of this method.
-        if y_level_count == 2:
-            self.y_level_count = np.array([1])
+        # with logistic models, this is signaled to fortran by passing in a
+        # 1 for nc (num classes).
+        if self._n_classes == 2:
+            f_n_classes = np.array([1])
         else:
-            self.y_level_count = np.array([y_level_count])
+            f_n_classes = np.array([self._n_classes])
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
@@ -172,7 +163,6 @@ class LogisticNet(GlmNet):
         self._validate_matrix(X)
         self._validate_inputs(X, y)
         self._validate_lambdas(X, y, lambdas)
-        self._validate_weights(X, y, weights)
         self._validate_rel_penalties(X, y, rel_penalties)
         self._validate_excl_preds(X, y, excl_preds)
         self._validate_box_constraints(X, y, box_constraints)
@@ -190,7 +180,7 @@ class LogisticNet(GlmNet):
             self._n_passes,
             self._error_flag) = _glmnet.lognet(
                                     self.alpha, 
-                                    self.y_level_count,
+                                    f_n_classes,
                                     X,
                                     y, 
                                     self.offsets,
@@ -222,7 +212,7 @@ class LogisticNet(GlmNet):
                                     self.alpha, 
                                     X.shape[0],
                                     X.shape[1],
-                                    self.y_level_count,
+                                    f_n_classes,
                                     X.data,
                                     ind_ptrs,
                                     indices,
@@ -261,7 +251,7 @@ class LogisticNet(GlmNet):
                   )
 
     @property
-    def coefficients(self):
+    def _coefficients(self):
         '''The fit model coefficients for each lambda.
  
           The dimensions of this array depend on whether of not a two class
@@ -276,19 +266,11 @@ class LogisticNet(GlmNet):
               model coefficients for each level of the response, for each
               lambda.
         '''
-        if self.logistic:
-            return self._logistic_coef()
-        else:
-            raise NotImplementedError("Only two class regression is currently "
-                                      "implemented."
-                  )
-
-    def _logistic_coef(self):
         self._check_if_fit()
-        ccsq = np.squeeze(self._comp_coef)
-        return ccsq[:np.max(self._n_comp_coef),
-                    :self._out_n_lambdas
-                ]
+        return self._comp_coef[:np.max(self._n_comp_coef),
+                               :,
+                               :self._out_n_lambdas
+                    ].squeeze()
 
     def _max_lambda(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
@@ -318,15 +300,23 @@ class LogisticNet(GlmNet):
         scale as the weights, which causes the normalization factor to drop
         out of the equation.
         '''
+        # TODO: These calculations assume the y is a one dimensional vector 
+        # of 0s and 1s, they do not cover the case of a multi column y.
+        self._check_y(y)
         if issparse(X):
             return self._max_lambda_sparse(X, y, weights)
         else:
             return self._max_lambda_dense(X, y, weights)
 
     def _max_lambda_dense(self, X, y, weights=None):
-        if weights is not None:
-            raise ValueError("LogisticNet cannot be fit with weights.")
-        X_scaled = preprocessing.scale(X)
+        self._check_y(y)
+        self._check_weights(weights)
+        # Standardize the model matrix.
+        normfac = X.shape[0]
+        mu = X.sum(axis=0) / normfac
+        mu2 = (X*X).sum(axis=0) / normfac
+        X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
+        dots = np.dot(y, X_scaled)
         # Working response
         p = np.mean(y)
         working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
@@ -372,6 +362,8 @@ class LogisticNet(GlmNet):
         '''Calculate the binomial deviance for every lambda. The model must
         already be fit to call this method.
         '''
+        # TODO: This only covers the case of a one dimensional y, need to 
+        # support multiple columns for y.
         y_hat = self.predict(X)
         # Take the response y, and repeat it as a column to produce a matrix
         # of the same dimensions as y_hat
@@ -383,6 +375,7 @@ class LogisticNet(GlmNet):
 
     def predict(self, X):
         '''Return model predictions on the probability scale.'''
+        # TODO This only support a one dimensional y.
         return 1 / ( 1 + np.exp(self._predict_lp(X)) )
 
     def plot_paths(self):
@@ -390,3 +383,16 @@ class LogisticNet(GlmNet):
 
     def __str__(self):
         return self._str('logistic')
+
+    def _check_y(self, y):
+        '''Temporary safety net.'''
+        if len(y.shape) != 1:
+            raise NotImplementedError(
+                "This method does not yet support non-one dimensional y "
+                "arrays."
+            )
+
+    def _check_weights(self, weights):
+        '''Logistic models do not support sample weights.'''
+        if weights is not None:
+            raise ValueError("LogisticNet cannot be fit with weights.")
