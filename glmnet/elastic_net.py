@@ -91,7 +91,7 @@ class ElasticNet(GlmNet):
           * _p_comp_coef: 
               A one dimensional integer array associating the coefficients in
               _comp_coef to columns in the model matrix. 
-          * _indicies: 
+          * _indices: 
               The same information as _p_comp_coef, but zero indexed to be
               compatable with numpy arrays.
           * _n_comp_coef: 
@@ -204,7 +204,7 @@ class ElasticNet(GlmNet):
         # The indexes into the predictor array are off by one due to fortran
         # convention differing from numpys, this make them indexes into the the
         # numpy array. 
-        self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
+        self._indices = np.trim_zeros(self._p_comp_coef, 'b') - 1
         # Keep some model metadata.
         self._n_fit_obs, self._n_fit_params = X.shape
         # Create a list of column names for the fit parameters, these can be

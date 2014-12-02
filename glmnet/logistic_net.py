@@ -103,7 +103,7 @@ class LogisticNet(GlmNet):
           * _p_comp_coef: 
               A one dimensional integer array associating the coefficients in
               _comp_coef to columns in the model matrix. 
-          * _indicies: 
+          * _indices: 
               The same information as _p_comp_coef, but zero indexed to be
               compatable with numpy arrays.
           * _n_comp_coef: 
@@ -240,7 +240,7 @@ class LogisticNet(GlmNet):
         # The indexes into the predictor array are off by one due to fortran
         # convention differing from numpys, this make them indexes into the the
         # numpy array. 
-        self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
+        self._indices = np.trim_zeros(self._p_comp_coef, 'b') - 1
         # Create a list of column names for the fit parameters, these can be
         # passed in, or attached to the matrix from patsy.  If none are found
         # we crate our own stupid ones.
