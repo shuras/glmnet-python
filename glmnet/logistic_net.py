@@ -25,7 +25,7 @@ class LogisticNet(GlmNet):
     predictor.
     '''
 
-    def fit(self, X, y,
+    def fit(self, X, y, col_names=None,
             lambdas=None, weights=None, rel_penalties=None,
             excl_preds=None, box_constraints=None, offsets=None):
         '''Fit a logistic or multinomial net model.
@@ -125,6 +125,7 @@ class LogisticNet(GlmNet):
               model.
         '''
         self._check_if_unfit()
+        self._check_y(y)
         self._check_weights(weights)
         # Convert to arrays is native python objects
         try:
@@ -150,6 +151,12 @@ class LogisticNet(GlmNet):
             f_n_classes = np.array([1])
         else:
             f_n_classes = np.array([self._n_classes])
+        # Grab the design info from patsy for later use, we are abbout to write
+        # over this object in some cases.
+        if hasattr(X, 'design_info'):
+            design_info = X.design_info
+        else:
+            design_info = None
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
@@ -234,6 +241,17 @@ class LogisticNet(GlmNet):
         # convention differing from numpys, this make them indexes into the the
         # numpy array. 
         self._indicies = np.trim_zeros(self._p_comp_coef, 'b') - 1
+        # Create a list of column names for the fit parameters, these can be
+        # passed in, or attached to the matrix from patsy.  If none are found
+        # we crate our own stupid ones.
+        if col_names != None:
+           self._col_names = col_names
+        elif design_info != None:
+            self._col_names = design_info.column_names
+        else:
+            self._col_names = [
+                'var_' + str(i) for i in range(self._n_fit_params)
+            ]
 
     def _validate_offsets(self, X, y, offsets):
         '''If no explicit offset was setup, we assume a zero offset.'''
@@ -381,11 +399,10 @@ class LogisticNet(GlmNet):
     def plot_paths(self):
         self._plot_path('logistic')
 
-    def __str__(self):
-        return self._str('logistic')
-
     def _check_y(self, y):
-        '''Temporary safety net.'''
+        '''Temporary safety net.  glmnet has the ability to fit a mutinomial
+        model, but this class currently cannot handle that case.
+        '''
         if len(y.shape) != 1:
             raise NotImplementedError(
                 "This method does not yet support non-one dimensional y "
@@ -396,3 +413,9 @@ class LogisticNet(GlmNet):
         '''Logistic models do not support sample weights.'''
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
+
+    def __str__(self):
+        return self._str('logistic')
+
+    def describe(self, lidx=None):
+        return self._describe('logistic')

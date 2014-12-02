@@ -211,16 +211,6 @@ class GlmNet(object):
                              "sparse row format."
                   )
 
-    @staticmethod
-    def _get_dot(X):
-        '''Get the underlying function for a dot product of two matricies, 
-        independent of type.  This allows us to write dot(X, Y) for both 
-        dense and sparse matricies.
-        '''
-        if issparse(X):
-            return X.dot.__func__
-        else:
-            return np.dot
 
     def _check_errors(self):
         '''Check for errors, documented in glmnet.f.'''
@@ -259,6 +249,81 @@ class GlmNet(object):
         self._check_if_fit()
         return self._intercepts.ravel()[:self._out_n_lambdas]
 
+    def get_coefficients_from_lambda_idx(self, lidx):
+        '''Get the array of coefficient estimates given an index into the
+        array of fit lambdas, that is, for a fixed lambda (index) return the
+        estimates of the various coefficients given lambda.
+
+          An array of length _n_fit_params (i.e. X.shape[1]).
+        '''
+        coefs = np.zeros(shape=(self._n_fit_params,))
+        coefs[self._indicies] = self._coefficients[:,lidx]
+        return coefs
+
+    def get_coefficients_from_col_idx(self, cidx):
+        '''Get the array of coefficient estimates given the index of a 
+        column in the model matrix, that is, for a fixed column return all the
+        various estimates of the associated coefficient across lambda.  Returns
+        the zero array if the coefficient is compressed out of _coefficients.
+
+          An array of length _out_n_lambdas.
+        '''
+        if cidx not in self._indicies:
+            return np.zeros(shape=(self._out_n_lambdas,))
+        else:
+           ridx = np.where(self._indicies == cidx)
+           return self._coefficients[ridx,:].squeeze()
+
+    def _describe(self, lidx=None, name='glmnet'):
+        '''Display information about the model.  Behaviour depends on 
+        state of the model when called, and whether a specific lambda index
+        is passed.
+        '''
+        display_str = self._str(name)
+        if self._is_fit():
+            display_str = display_str + self._fit_str(name)
+        if lidx != None:
+            sep = '-'*79 + '\n'
+            display_str = display_str + sep + self._coef_str(lidx, name)
+        return display_str.strip()
+
+    def _str(self, name):
+        '''A generic message pertaining to all glmnets.'''
+        return 'A {name} net model with alpha = {alpha}.\n'.format(
+                   name=name, alpha=self.alpha
+               )
+
+    def _fit_str(self, name):
+        '''A generic message pertaining to all fit glmnets.'''
+        self._check_if_fit()
+        s = ("The model was fit on {0} observations and {1} parameters.     \n"
+             "The model was fit in {2} passes over the data.                \n"
+             "There were {3} values of lambda resulting in non-zero models. \n"
+             "There were {4} non-zero coefficients in the largest model.    \n")
+        return s.format(self._n_fit_obs, self._n_fit_params,
+                        self._n_passes,
+                        self._out_n_lambdas,
+                        np.max(self._n_comp_coef)
+               )
+
+    def _coef_str(self, lidx, name):
+        '''Create a string containing a table of coefficient estimates for
+        a given value of lambda.
+        '''
+        lam = self.out_lambdas[lidx]
+        coefs = self.get_coefficients_from_lambda_idx(lidx)
+        title = ("Parameter Estiamtes for {net} net model with "
+                 "lambda = {lam:1.5e}\n").format(net=name, lam=lam)
+        header = "{nameh:<40}{valh:<10}\n".format(
+            nameh="Varaible Name", valh="Coefficent Estiamte"
+        )
+        line_template = "{name:<40}{val:1.5e}"
+        body = "\n".join(
+            line_template.format(name=self._col_names[i], val=coefs[i])
+            for i in range(self._n_fit_params)
+        )
+        return title + header + body
+        
     def _predict_lp(self, X):
         '''Model predictions on a linear predictor scale.
 
@@ -288,20 +353,6 @@ class GlmNet(object):
         ax.set_ylabel("Parameter Value")
         plt.show()
 
-    def _str(self, name):
-        '''A generic message contining data common to all glmnets.'''
-        self._check_if_fit()
-        s = ("A %s net model fit on %d observations and %d parameters.     \n"
-             "The model was fit in %d passes over the data.                \n"
-             "There were %d values of lambda resulting in non-zero models. \n"
-             "There were %d non-zero coefficients in the largest model.    \n")
-        return s % (name, 
-                    self._n_fit_obs, self._n_fit_params,
-                    self._n_passes,
-                    self._out_n_lambdas,
-                    np.max(self._n_comp_coef)
-               )
-
     def _clone(self):
         '''Copy an unfit glmnet object.'''
         return self.__class__(**self.__dict__)
@@ -325,3 +376,14 @@ class GlmNet(object):
 
     def _check_if_unfit(self):
         return self._check_if_fit(reverse=True)
+
+    @staticmethod
+    def _get_dot(X):
+        '''Get the underlying function for a dot product of two matricies, 
+        independent of type.  This allows us to write dot(X, Y) for both 
+        dense and sparse matricies.
+        '''
+        if issparse(X):
+            return X.dot.__func__
+        else:
+            return np.dot

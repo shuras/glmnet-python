@@ -121,6 +121,12 @@ class ElasticNet(GlmNet):
             raise ValueError("X and y must be either numpy arrays, or "
                              "convertable to numpy arrays."
                   )
+        # Grab the design info from patsy for later use, we are abbout to write
+        # over this object in some cases.
+        if hasattr(X, 'design_info'):
+            design_info = X.design_info
+        else:
+            design_info = None
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
@@ -206,9 +212,8 @@ class ElasticNet(GlmNet):
         # we crate our own stupid ones.
         if col_names != None:
            self._col_names = col_names
-        # Model matrix generated from patsy.
-        elif hasattr(X, 'design_info'):
-            self._col_names = X.design_info.column_names
+        elif design_info != None:
+            self._col_names = design_info.column_names
         else:
             self._col_names = [
                 'var_' + str(i) for i in range(self._n_fit_params)
@@ -226,30 +231,6 @@ class ElasticNet(GlmNet):
                                :self._out_n_lambdas
                 ]
 
-    def get_coefficients_from_lambda_idx(self, lidx):
-        '''Get the array of coefficient estimates given an index into the
-        array of fit lambdas, that is, for a fixed lambda (index) return the
-        estimates of the various coefficients given lambda.
-
-          An array of length _n_fit_params (i.e. X.shape[1]).
-        '''
-        coefs = np.zeros(shape=(self._n_fit_params,))
-        coefs[self._indicies] = self._coefficients[:,lidx]
-        return coefs
-
-    def get_coefficients_from_col_idx(self, cidx):
-        '''Get the array of coefficient estimates given the index of a 
-        column in the model matrix, that is, for a fixed column return all the
-        various estimates of the associated coefficient across lambda.  Returns
-        the zero array if the coefficient is compressed out of _coefficients.
-
-          An array of length _out_n_lambdas.
-        '''
-        if cidx not in self._indicies:
-            return np.zeros(shape=(self._out_n_lambdas,))
-        else:
-           ridx = np.where(self._indicies == cidx)
-           return self._coefficients[ridx,:].squeeze()
 
     def _max_lambda(self, X, y, weights=None):
         '''Return the maximum value of lambda useful for fitting, i.e. that
@@ -355,33 +336,4 @@ class ElasticNet(GlmNet):
         return self._str('elastic')
 
     def describe(self, lidx=None):
-        '''Display information about the model.  Behaviour depends on 
-        state of the model when called, and whether a specific lambda index
-        is passed.
-        '''
-        if not self._is_fit():
-            display_str = "An unfit elastic net model."
-        else:
-            display_str = self.__str__()
-            if lidx != None:
-                sep = '-'*79 + '\n'
-                display_str = display_str + sep + self._coef_str(lidx)
-        return display_str
-
-    def _coef_str(self, lidx):
-        '''Creat a string containing a table of coefficient estimates for
-        a given value of lambda.
-        '''
-        lam = self.out_lambdas[lidx]
-        coefs = self.get_coefficients_from_lambda_idx(lidx)
-        title = ("Parameter Estiamtes for elastic net model with "
-                 "lambda = {lam:1.5e}\n").format(lam=lam)
-        header = "{nameh:<40}{valh:<10}\n".format(
-            nameh="Varaible Name", valh="Coefficent Estiamte"
-        )
-        line_template = "{name:<40}{val:1.5e}"
-        body = "\n".join(
-            line_template.format(name=self._col_names[i], val=coefs[i])
-            for i in range(self._n_fit_params)
-        )
-        return title + header + body
+        return self._describe(lidx, 'elastic')
