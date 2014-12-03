@@ -334,7 +334,7 @@ class GlmNet(object):
         dot = self._get_dot(X)
         if np.max(self._n_comp_coef) > 0 :
             return self.intercepts + dot(X[:, self._indices],
-                                        self.coefficients
+                                        self._coefficients
                                         )
         else :
             return np.tile(self.intercepts, (X.shape[0], 1))
