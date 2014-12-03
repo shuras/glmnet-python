@@ -337,3 +337,42 @@ class TestElasticNet(unittest.TestCase):
         box_const = np.empty(shape=(2,10))
         box_const[0,:] = -1; box_const[1,:] = 1
         enet._validate_box_constraints(X, y, box_constraints=box_const)
+
+    def test_edge_cases(self):
+        '''Edge cases in model specification.'''
+        X = np.random.random(size=(50,10))
+        w = np.random.random(size=(10,))
+        y = np.dot(X, w)
+        # Edge case
+        #    A single lambda is so big that it sets all estimated coefficients
+        #    to zero.  This used to break the predict method.
+        enet = ElasticNet(alpha=1)
+        enet.fit(X, y, lambdas=[10**5])
+        _ = enet.predict(X)
+        # Edge case
+        #    Multiple lambdas are so big as to set all estiamted coefficients
+        #    to zero.  This used to break the predict method.
+        enet = ElasticNet(alpha=1)
+        enet.fit(X, y, lambdas=[10**5, 2*10**5])
+        _ = enet.predict(X)
+        # Edge case:
+        #    Some predictors have zero varaince.  This used to break lambda 
+        #    max.
+        X = np.random.random(size=(50,10))
+        X[:,2] = 0; X[:,8] = 1
+        y = np.dot(X, w)
+        enet = ElasticNet(alpha=.1)
+        enet.fit(X, y)
+        ol = enet.out_lambdas
+        max_lambda_from_fortran = ol[1] * (ol[1]/ol[2]) 
+        max_lambda_from_python = enet._max_lambda(X, y)
+        self.assertAlmostEqual(
+            max_lambda_from_fortran, max_lambda_from_python, 4
+        )
+        # Edge case.
+        #     All predictors have zero variance.  This is an error in 
+        #     sepcification.
+        with self.assertRaises(ValueError):
+            X = np.ones(shape=(50,10))
+            enet = ElasticNet(alpha=.1)
+            enet.fit(X, y)

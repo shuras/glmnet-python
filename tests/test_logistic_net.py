@@ -74,3 +74,42 @@ class TestLogisticNet(unittest.TestCase):
                 self.assertAlmostEqual(
                     max_lambda_from_fortran, max_lambda_from_python, 4
                 )
+                
+    def test_edge_cases(self):
+        '''Edge cases in model specification.'''
+        X = np.random.uniform(-1, 1, size=(50,10))
+        w = np.random.uniform(-1, 1, size=(10,))
+        y = (np.dot(X, w) >= 0).astype(int)
+        # Edge case
+        #    A single lambda is so big that it sets all estimated coefficients
+        #    to zero.  This used to break the predict method.
+        lnet = LogisticNet(alpha=1)
+        lnet.fit(X, y, lambdas=[10**5])
+        _ = lnet.predict(X)
+        # Edge case
+        #    Multiple lambdas are so big as to set all estiamted coefficients
+        #    to zero.  This used to break the predict method.
+        lnet = LogisticNet(alpha=1)
+        lnet.fit(X, y, lambdas=[10**5, 2*10**5])
+        _ = lnet.predict(X)
+        # Edge case:
+        #    Some predictors have zero varaince.  This used to break lambda 
+        #    max.
+        X = np.random.uniform(-1, 1, size=(50,10))
+        X[2,:] = 0; X[8,:] = 0
+        y = (np.dot(X, w) >= 0).astype(int)
+        lnet = LogisticNet(alpha=.1)
+        lnet.fit(X, y)
+        ol = lnet.out_lambdas
+        max_lambda_from_fortran = ol[1] * (ol[1]/ol[2]) 
+        max_lambda_from_python = lnet._max_lambda(X, y)
+        self.assertAlmostEqual(
+            max_lambda_from_fortran, max_lambda_from_python, 4
+        )
+        # Edge case.
+        #     All predictors have zero variance.  This is an error in 
+        #     sepcification.
+        with self.assertRaises(ValueError):
+            X = np.ones(shape=(50,10))
+            lnet = LogisticNet(alpha=.1)
+            lnet.fit(X, y)
