@@ -263,6 +263,11 @@ class TestElasticNet(unittest.TestCase):
             rel_pens = np.ones(shape=(10,))
             rel_pens[5] = -1
             enet._validate_rel_penalties(X, y, rel_penalties=rel_pens)
+        # Invalid use:
+        #    Passing in a rel_panalties with no positive entries.
+        with self.assertRaises(ValueError):
+            rel_pens = np.zeros(shape=(10,))
+            enet._validate_rel_penalties(X, y, rel_penalties=rel_pens)
         # Valid use:
         #    Rel_penalties has the correct dimenstion with all non-negative
         #    entries.
