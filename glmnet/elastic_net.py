@@ -251,7 +251,10 @@ class ElasticNet(GlmNet):
             normfac = X.shape[0]
             mu = X.sum(axis=0) / normfac
             mu2 = (X*X).sum(axis=0) / normfac
-            X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
+            sigma = np.sqrt(mu2 - mu*mu)
+            # Avoid divide by zero in constant case.
+            sigma[sigma == 0] = 1
+            X_scaled = (X - mu) / sigma
             dots = dot(y, X_scaled)
         else:
             # Standardize X using the sample weights and then find the
@@ -259,7 +262,10 @@ class ElasticNet(GlmNet):
             y_wtd = y * weights
             mu = dot(weights, X)
             mu2 = dot(weights, X*X)
-            X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
+            sigma = np.sqrt(mu2 - mu*mu)
+            # Avoid divide by zero in constant case.
+            sigma[sigma == 0] = 1
+            X_scaled = (X - mu) / sigma
             dots = dot(y_wtd, X_scaled)
             # Since we included weights in the dot product we do not need
             # to include the weight in the denominator.

@@ -321,25 +321,28 @@ class LogisticNet(GlmNet):
         # TODO: These calculations assume the y is a one dimensional vector 
         # of 0s and 1s, they do not cover the case of a multi column y.
         self._check_y(y)
+        self._check_weights(weights)
         if issparse(X):
             return self._max_lambda_sparse(X, y, weights)
         else:
             return self._max_lambda_dense(X, y, weights)
 
     def _max_lambda_dense(self, X, y, weights=None):
-        self._check_y(y)
-        self._check_weights(weights)
+        '''Calculation based on least squares case with a working response
+        and working weights.
+        '''
+        p = np.mean(y)
+        working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
+        working_weights = p*(1 - p) / (X.shape[0])
         # Standardize the model matrix.
         normfac = X.shape[0]
         mu = X.sum(axis=0) / normfac
         mu2 = (X*X).sum(axis=0) / normfac
-        X_scaled = (X - mu) / np.sqrt(mu2 - mu*mu)
+        sigma = np.sqrt(mu2 - mu*mu)
+        # Avoid divide by zero in constant case
+        sigma[sigma == 0] = 1
+        X_scaled = (X - mu) / sigma
         dots = np.dot(y, X_scaled)
-        # Working response
-        p = np.mean(y)
-        working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
-        # Working weights
-        working_weights = p*(1 - p) / (X.shape[0])
         # Now mimic the calculation for the quadratic case
         y_wtd = working_resp * working_weights
         dots = y_wtd.dot(X_scaled)
@@ -350,14 +353,16 @@ class LogisticNet(GlmNet):
         return np.max(np.abs(dots)) / alpha
 
     def _max_lambda_sparse(self, X, y, weights=None):
-        '''To preserve the sparsity, we must avoid explicitly subtracting out
+        '''Calculation based on least squares case with a working response
+        and working weights.
+
+          To preserve the sparsity, we must avoid explicitly subtracting out
         the mean of the columns.
         '''
         if weights is not None:
             raise ValueError("LogisticNet cannot be fit with weights.")
         # Sparse dot product
         dot = self._get_dot(X)
-        # Calculation is modeled on weighted least squares
         p = np.mean(y)
         working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
         working_weights = p*(1 - p) / (X.shape[0])
@@ -366,6 +371,8 @@ class LogisticNet(GlmNet):
         mu = E(X)
         mu_2 = E(X.multiply(X))
         sigma = np.sqrt(mu_2 - mu*mu)
+        # Avoid divide by zero in case of constant column.
+        sigma[sigma == 0] = 1
         # Calculating the dot product of y with X standardized, without 
         # destorying the sparsity of X
         y_wtd = working_resp * working_weights
