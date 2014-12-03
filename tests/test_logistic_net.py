@@ -21,7 +21,7 @@ class TestLogisticNet(unittest.TestCase):
                 self.assertTrue(np.all(y == preds))
 
     def test_lasso_models(self):
-        Xdn = np.random.uniform(-1, 1, size=(500,10))
+        Xdn = np.random.uniform(-1, 1, size=(15000,10))
         Xsp = csc_matrix(Xdn)
         w = (np.random.uniform(-1, 1, size=(10,)) >= 0).astype(int) - .5
         for w_mask in range(1, 10):
@@ -37,7 +37,7 @@ class TestLogisticNet(unittest.TestCase):
                 )
 
     def test_ridge_models(self):
-        Xdn = np.random.uniform(-1, 1, size=(10000,3))
+        Xdn = np.random.uniform(-1, 1, size=(50000,3))
         Xsp = csc_matrix(Xdn)
         w = (np.random.uniform(-1, 1, size=(3,)) >= 0).astype(int) - .5
         for X in (Xdn, Xsp):
@@ -54,7 +54,6 @@ class TestLogisticNet(unittest.TestCase):
                     norm_ratios, 1, atol=.05
                 )
                 self.assertTrue(test)
-
 
     def test_max_lambda(self):
         Xdn = np.random.uniform(-1, 1, size=(50,10))

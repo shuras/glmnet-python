@@ -16,7 +16,7 @@ class TestElasticNet(unittest.TestCase):
         relationship without error.  That is, the fit parameters equals the
         true coefficients.
         '''
-        Xdn = np.random.random(size=(50,10))
+        Xdn = np.random.random(size=(5000,10))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(10,))
         y = np.dot(Xdn, w)
@@ -38,7 +38,7 @@ class TestElasticNet(unittest.TestCase):
         linearly related data were some number of the coefficients are
         exactly zero, and make sure the lasso model can pick these out.
         '''
-        Xdn = np.random.random(size=(50,10))
+        Xdn = np.random.random(size=(25000,10))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(10,))
         for w_mask in range(1, 10):
@@ -65,7 +65,7 @@ class TestElasticNet(unittest.TestCase):
         data is sufficiently correlation free, otherwise the effect to be 
         measured does not occur.
         '''
-        Xdn = np.random.random(size=(10000,3))
+        Xdn = np.random.random(size=(50000,3))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(3,))
         for X in (Xdn, Xsp):
@@ -84,11 +84,11 @@ class TestElasticNet(unittest.TestCase):
         '''Test that fitting an unregularized model (lambda=0) gives expected
         results when sample weights are used.
         '''
-        Xdn = np.random.random(size=(50,10))
+        Xdn = np.random.random(size=(5000,10))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(10,))
         y = np.dot(Xdn, w)
-        sw = np.random.uniform(size=(50,))
+        sw = np.random.uniform(size=(5000,))
         for alpha in [0, .5, 1]:
             for X in (Xdn, Xsp): 
                 enet = ElasticNet(alpha=alpha)
@@ -102,10 +102,10 @@ class TestElasticNet(unittest.TestCase):
         '''Test that a pure lasso (alpha=1) model gives expected results when
         sample weights are used.        
         '''
-        Xdn = np.random.random(size=(50,10))
+        Xdn = np.random.random(size=(25000,10))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(10,))
-        sw = np.random.uniform(size=(50,))
+        sw = np.random.uniform(size=(25000,))
         sw = sw / np.sum(sw)
         for w_mask in range(1, 10):
             for X in (Xdn, Xsp):
@@ -116,15 +116,16 @@ class TestElasticNet(unittest.TestCase):
                 enet.fit(X, y, lambdas=[.01], weights=sw)
                 test = (len(enet._coefficients.ravel() == w_mask))
                 self.assertTrue(test)
+        #raise RuntimeError
 
     def test_ridge_with_weights(self):
         '''Test that a pure ridge (alpha=0) model gives expected results
         for both dense and sparse matricies.
         '''
-        Xdn = np.random.random(size=(10000,3))
+        Xdn = np.random.random(size=(50000,3))
         Xsp = csc_matrix(Xdn)
         w = np.random.random(size=(3,))
-        sw = np.random.uniform(size=(10000,))
+        sw = np.random.uniform(size=(50000,))
         sw = sw / np.sum(sw)
         for X in (Xdn, Xsp):
             for lam in np.linspace(0, 1, 10):
@@ -247,7 +248,7 @@ class TestElasticNet(unittest.TestCase):
         w = np.random.random(size=(10,))
         y = np.dot(X, w)
         enet = ElasticNet(alpha=.5)
-        # Invalid use
+        # Invalid use:
         #    Passing in a rel_penalties vector that is too short.
         with self.assertRaises(ValueError):
             rel_pens = np.ones(shape=(9,))
