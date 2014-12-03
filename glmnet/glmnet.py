@@ -257,7 +257,7 @@ class GlmNet(object):
           An array of length _n_fit_params (i.e. X.shape[1]).
         '''
         coefs = np.zeros(shape=(self._n_fit_params,))
-        coefs[self._indicies] = self._coefficients[:,lidx]
+        coefs[self._indices] = self._coefficients[:,lidx]
         return coefs
 
     def get_coefficients_from_col_idx(self, cidx):
@@ -268,10 +268,10 @@ class GlmNet(object):
 
           An array of length _out_n_lambdas.
         '''
-        if cidx not in self._indicies:
+        if cidx not in self._indices:
             return np.zeros(shape=(self._out_n_lambdas,))
         else:
-           ridx = np.where(self._indicies == cidx)
+           ridx = np.where(self._indices == cidx)
            return self._coefficients[ridx,:].squeeze()
 
     def _describe(self, lidx=None, name='glmnet'):
@@ -332,9 +332,12 @@ class GlmNet(object):
         '''
         self._check_if_fit()
         dot = self._get_dot(X)
-        return self.intercepts + dot(X[:, self._indicies],
-                                        self._coefficients
-                                    )
+        if np.max(self._n_comp_coef) > 0 :
+            return self.intercepts + dot(X[:, self._indices],
+                                        self.coefficients
+                                        )
+        else :
+            return np.tile(self.intercepts, (X.shape[0], 1))
 
     def _plot_path(self, name):
         '''Plot the full regularization path of all the non-zero model
