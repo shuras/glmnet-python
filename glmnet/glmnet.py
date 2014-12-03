@@ -143,6 +143,10 @@ class GlmNet(object):
                   )
         if np.any(self.rel_penalties < 0):
             raise ValueError("All relative penalties must be non-negative.")
+        if np.max(self.rel_penalties) <= 0:
+            raise ValueError("Must have at least one positive relative "
+                             "penalty."
+                  )
 
     def _validate_excl_preds(self, X, y, excl_preds):
         '''If no explicit exclusion is supplied, pass a zero to exclude nothing.
