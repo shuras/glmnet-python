@@ -1,4 +1,4 @@
-glmnet wrappers for Python
+Glmnet Wrappers for Python
 ==========================
 
 This package provides a convenient python interface to Jerome Friedman's
@@ -31,7 +31,7 @@ a response vector `y`:
 enet.fit(X, y)
 ```
 
-Glmnet also accepts sparse design matricies, using the compressed sparse
+glmnet also accepts sparse design matrices, using the compressed sparse
 column format:
 
 ```
@@ -40,15 +40,50 @@ Xsp = csc_matrix(X)
 enet.fit(Xsp, y)
 ```
 
+Fitting a glmnet automatically fits models for multiple values of `lambda`,
+the overall amount of regularization.
+
 After fitting, the model can be used to generate predictions on new data:
 
 ```
 enet.predict(X')
 ```
 
-(Note that this generates predictions for each value of `lambda` that was 
-used in the coordinate descent algorithm).  The parameter paths can also be
-visualized, that is, the values of the model parameters for each `lambda`:
+note that this generates predictions for each lambda glmnet chose during 
+fitting.
+
+or get a summary of the model:
+
+```
+enet.describe()
+```
+
+```
+A elastic net model with alpha = 0.1.
+The model was fit on 100 observations and 5 parameters.     
+The model was fit in 169 passes over the data.                
+There were 77 values of lambda resulting in non-zero models. 
+There were 4 non-zero coefficients in the largest model.    
+```
+
+Passing a lambda index into describe will display the fit coefficients:
+
+```
+enet.describe(lidx=20)
+```
+
+```
+Parameter Estiamtes for elastic net model with lambda = 7.12026e-02
+Varaible Name                           Coefficent Estiamte
+C(catagorical_var)[A]                   -2.17143e-01
+C(catagorical_var)[B]                   2.13176e-01
+first_var                               5.43638e-01
+another_var                             0.00000e+00
+the_last_var                            2.72075e-01
+```
+
+The parameter paths can also be visualized, that is, the values of the model
+parameters for each `lambda`:
 
 ```
 enet.plot_paths()
@@ -56,7 +91,7 @@ enet.plot_paths()
 
 ![Param-Plot](https://raw.githubusercontent.com/madrury/glmnet-python/master/images/reg_paths.png)
 
-To select a value of `lambda` cross-validation can be used:
+To select a value of `lambda` cross-validation is provided:
 
 ```
 from glmnet import ElasticNet, CVGlmNet
@@ -65,16 +100,8 @@ enet_cv = CVGlmNet(enet, folds=10, n_jobs=10)
 enet_cv.fit(X, y)
 ```
 
-Glmnet then fits ten models for each value of `lambda`, and chooses the best
+Glmnet then fits ten models for each value of `lambda` and chooses the best
 model by observing which optimizes the out of fold deviance. 
-
-**Note**: glmnet uses the joblib.Parallel function to parallelize its fitting
-across folds, there is a known bug in some versions of OSX where using this
-causes a race condition and the fitting will hang.  Setting `n_jobs=1` will
-disable the cross validation, at the expense of fitting the models in series.
-The parallelization has been tested on various linux boxes with no issues. See
-[this sklearn issue](https://github.com/scikit-learn/scikit-learn/issues/636) for more
-information.
 
 Once the cross validation is fit, the mean out of fold deviances for each value
 of `lambda` can be viewed, along with their standard deviations:
@@ -91,22 +118,18 @@ optimal value of `lambda`:
 enet_cv.predict(X')
 ```
 
+**Note**: glmnet uses the joblib.Parallel function to parallelize its fitting
+across folds, there is a known bug in some versions of OSX where using this
+causes a race condition and the fitting will hang.  Setting `n_jobs=1` will
+disable the cross validation, at the expense of fitting the models in series.
+If using the anaconda distribution of python, enabling the mkl optimizations
+will allow the models to be fit in parallel.  The parallelization has also been
+tested on various linux boxes with no issues. See
+[this sklearn issue](https://github.com/scikit-learn/scikit-learn/issues/636) for more
+information.
+
 Building
 --------
-
-In order to get double precision working without modifying Friedman's code,
-some compiler trickery is required. The wrappers have been written such that
-everything returned is expected to be a `real*8` i.e. a double-precision
-floating point number, and unfortunately the code is written in a way 
-Fortran is often written with simply `real` specified, letting the compiler
-decide on the appropriate width. `f2py` assumes `real` are always 4 byte/
-single precision, hence the manual change in the wrappers to `real*8`, but
-that change requires the actual Fortran code to be compiled with 8-byte reals,
-otherwise bad things will happen (the stack will be blown, program will hang 
-or segfault, etc.).
-
-AFAIK, this package requires  `gfortran` to build. `g77` will not work as
-it does not support `-fdefault-real-8`.
 
 A build script has been provided in the `glmnet/glmnet` directory, so to build
 the fortran extension:
@@ -124,9 +147,25 @@ import _glmnet
 
 Should work without error.
 
+AFAIK, this package requires  `gfortran` to build. `g77` will not work as
+it does not support `-fdefault-real-8`.
+
+In order to get double precision working without modifying Friedman's code,
+some compiler trickery is required. The wrappers have been written such that
+everything returned is expected to be a `real*8` i.e. a double-precision
+floating point number, and unfortunately the code is written in a way 
+Fortran is often written with simply `real` specified, letting the compiler
+decide on the appropriate width. `f2py` assumes `real` are always 4 byte/
+single precision, hence the manual change in the wrappers to `real*8`, but
+that change requires the actual Fortran code to be compiled with 8-byte reals,
+otherwise bad things will happen (the stack will be blown, program will hang 
+or segfault, etc.).
+
 Planned Enhancements
 --------------------
 
+* Improved interface with cross validation.
+* Pretty graphs with better knobs and dials.
 * Wrapper classes for the Poisson and Cox models.
 
 License
