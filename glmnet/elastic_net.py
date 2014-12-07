@@ -255,26 +255,24 @@ class ElasticNet(GlmNet):
             # Avoid divide by zero in constant case.
             sigma[sigma == 0] = 1
             X_scaled = (X - mu) / sigma
-            dots = dot(y, X_scaled)
+            dots = dot(y, X_scaled) / normfac
         else:
             # Standardize X using the sample weights and then find the
             # maximum weighted dot product.
-            y_wtd = y * weights
-            mu = dot(weights, X)
-            mu2 = dot(weights, X*X)
+            normfac = np.sum(weights)
+            mu = dot(weights, X) / normfac
+            mu2 = dot(weights, X*X) / normfac
             sigma = np.sqrt(mu2 - mu*mu)
             # Avoid divide by zero in constant case.
             sigma[sigma == 0] = 1
             X_scaled = (X - mu) / sigma
-            dots = dot(y_wtd, X_scaled)
-            # Since we included weights in the dot product we do not need
-            # to include the weight in the denominator.
-            normfac = 1
+            y_wtd = y * weights 
+            dots = dot(y_wtd, X_scaled) / normfac
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
         alpha = self.alpha if self.alpha > .0001 else .0001
-        return np.max(np.abs(dots)) / (alpha * normfac) 
+        return np.max(np.abs(dots)) / alpha 
 
     def _max_lambda_sparse(self, X, y, weights=None):
         '''To preserve the sparsity, we must avoid explicitly subtracting out
@@ -286,27 +284,27 @@ class ElasticNet(GlmNet):
         # destorying the sparsity of X.  The calculations themselves do not
         # differ from the dense case.
         if weights is None:
-            E = lambda M: np.asarray(M.sum(axis=0)).ravel() / M.shape[0]
+            normfac = X.shape[0]
+            E = lambda M: np.asarray(M.sum(axis=0)).ravel() / normfac
             mu = E(X)
             mu_2 = E(X.multiply(X))
             sigma = np.sqrt(mu_2 - mu*mu)
             sigma[sigma == 0] = 1.0
-            dots = 1/sigma * (dot(y, X) - mu * np.sum(y))
-            normfac = X.shape[0]
+            dots = 1/sigma * (dot(y, X) - mu * np.sum(y)) / normfac
         else:
-            y_wtd = y*weights
-            E = lambda M, wts: dot(wts, M)
-            mu = E(X, weights)
-            mu_2 = E(X.multiply(X), weights)
+            normfac = np.sum(weights)
+            E = lambda M: dot(weights, M) / normfac
+            mu = E(X)
+            mu_2 = E(X.multiply(X))
             sigma = np.sqrt(mu_2 - mu*mu)
             sigma[sigma == 0] = 1.0
-            dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd))
-            normfac = 1
+            y_wtd = y * weights
+            dots = 1/sigma * (dot(y_wtd, X) - mu * np.sum(y_wtd)) / normfac
         # An alpha of zero (ridge) breaks the maximum lambda logic, the 
         # coefficients are never all zero - so we readjust to a small
         # value.
         alpha = self.alpha if self.alpha > .0001 else .0001
-        return np.max(np.abs(dots)) / (alpha * normfac) 
+        return np.max(np.abs(dots)) / alpha 
 
     def deviance(self, X, y, weights = None):
         '''Calculate the normal deviance (i.e. sum of squared errors) for
