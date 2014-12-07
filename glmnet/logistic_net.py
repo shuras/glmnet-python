@@ -331,6 +331,8 @@ class LogisticNet(GlmNet):
         '''Calculation based on least squares case with a working response
         and working weights.
         '''
+        if weights is not None:
+            raise ValueError("LogisticNet cannot be fit with weights.")
         p = np.mean(y)
         working_resp = np.log(p/(1-p)) + (y - p) / (p*(1 - p))
         working_weights = p*(1 - p) / (X.shape[0])
@@ -342,7 +344,6 @@ class LogisticNet(GlmNet):
         # Avoid divide by zero in constant case
         sigma[sigma == 0] = 1
         X_scaled = (X - mu) / sigma
-        dots = np.dot(y, X_scaled)
         # Now mimic the calculation for the quadratic case
         y_wtd = working_resp * working_weights
         dots = y_wtd.dot(X_scaled)
