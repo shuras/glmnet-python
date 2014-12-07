@@ -45,11 +45,8 @@ class TestLogisticNet(unittest.TestCase):
                 y = (np.dot(Xdn, w) >= 0).astype(int)
                 lnet = LogisticNet(alpha=0)
                 lnet.fit(X, y, lambdas=[lam])
-                print lnet._coefficients
-                print w
                 ratios = lnet._coefficients.ravel() / w
                 norm_ratios = ratios / np.max(ratios)
-                print norm_ratios
                 test = np.allclose(
                     norm_ratios, 1, atol=.05
                 )
@@ -65,11 +62,8 @@ class TestLogisticNet(unittest.TestCase):
                 lnet = LogisticNet(alpha=alpha)
                 lnet.fit(X, y)
                 ol = lnet.out_lambdas
-                print ol
                 max_lambda_from_fortran = ol[1] * (ol[1]/ol[2]) 
-                print max_lambda_from_fortran 
                 max_lambda_from_python = lnet._max_lambda(X, y)
-                print max_lambda_from_python
                 self.assertAlmostEqual(
                     max_lambda_from_fortran, max_lambda_from_python, 4
                 )
