@@ -52,7 +52,7 @@ class CVGlmNet(object):
     '''
 
     def __init__(self, glmnet, 
-                 n_folds=3, n_jobs=3, shuffle=True, verbose=2
+                 n_folds=3, n_jobs=3, shuffle=True, verbose=2, cv_folds = None
         ):
         '''Create a cross validation glmnet object.  Accepts the following
         arguments:
@@ -60,16 +60,28 @@ class CVGlmNet(object):
           * glmnet: 
               An object derived from the GlmNet class, currently either an
               ElasticNet or LogisticNet object.
+          * cv_folds:
+              A fold object. If not passed, will use n_folds and shuffle
+              arguments to generate the folds.
           * n_folds: 
               The number of cross validation folds to use when fitting.
+              Ignored if the cv_folds argument is given.
           * n_jobs: 
               The number of cores to distribute the work to.
           * shuffle: 
               Boolean, should the indicies of the cross validation 
               folds be shuffled randomly.
+              Ignored if the cv_folds argument is given.
           * verbose: 
               Amount of talkyness.
         '''
+
+        self.cv_folds = cv_folds
+
+        if cv_folds:
+            n_folds = cv_folds.n_folds
+            shuffle = cv_folds.shuffle
+
         if n_folds > 1 and par_avail == False:
             raise ValueError("joblib.Parallel not available, must set n_folds "
                              "== 1"
@@ -91,15 +103,18 @@ class CVGlmNet(object):
         training data.  
         '''
         self._check_if_unfit()
-        # Determine the indicies of the various train and test sets for the 
-        # cross validation.
-        if weights is not None:
-            cv_folds = weighted_k_fold(X.shape[0], n_folds=self.n_folds,
+
+        cv_folds = self.cv_folds
+        if not cv_folds:
+            # Determine the indicies of the various train and test sets for the 
+            # cross validation.
+            if weights is not None:
+                cv_folds = weighted_k_fold(X.shape[0], n_folds=self.n_folds,
                                                    shuffle=self.shuffle,
                                                    weights=weights
                        )
-        else:
-            cv_folds = unweighted_k_fold(X.shape[0], n_folds=self.n_folds, 
+            else:
+                cv_folds = unweighted_k_fold(X.shape[0], n_folds=self.n_folds, 
                                                      shuffle=self.shuffle
                        ) 
         # Copy the glmnet so we can fit the instance passed in as the final
