@@ -53,26 +53,30 @@ class CVGlmNet(object):
 
     def __init__(self, glmnet, 
                  n_folds=3, n_jobs=3, include_full=True, 
-                 shuffle=True, verbose=2, cv_folds=None
+                 shuffle=True, cv_folds=None, verbose=1
         ):
-        '''Create a cross validation glmnet object.  Accepts the following
+        '''Create a cross validation glmnet object. Accepts the following
         arguments:
 
           * glmnet: 
               An object derived from the GlmNet class, currently either an
               ElasticNet or LogisticNet object.
-          * cv_folds:
-              A fold object. If not passed, will use n_folds and shuffle
-              arguments to generate the folds.
           * n_folds: 
               The number of cross validation folds to use when fitting.
               Ignored if the cv_folds argument is given.
+          * include_full:
+              Include the fitting of the full model during the cross
+              validation, using a special 'all the data' fold.  Allows the
+              full model fit to participate in parallelism.
           * n_jobs: 
               The number of cores to distribute the work to.
           * shuffle: 
               Boolean, should the indicies of the cross validation 
               folds be shuffled randomly.
               Ignored if the cv_folds argument is given.
+          * cv_folds:
+              A fold object. If not passed, will use n_folds and shuffle
+              arguments to generate the folds.
           * verbose: 
               Amount of talkyness.
         '''
@@ -96,6 +100,7 @@ class CVGlmNet(object):
         self.include_full = include_full
         self.shuffle = shuffle
         self.verbose = verbose
+        self._fit = False
 
     def fit(self, X, y, weights=None, lambdas=None, **kwargs):
         '''Determine the optimal value of lambda by cross validation.
@@ -103,9 +108,9 @@ class CVGlmNet(object):
           This method fits n_fold glmnet objects, each for the same sequence 
         of lambdas, and each on a different subset of the training data. The
         resulting models are then scored on the held-out-from-fold data at each
-        lambda, and the lambda that minimized the mean out of fold deviance is
-        found.  This lambda is then used to fit a final model on the full
-        training data.  
+        lambda, and the lambda that minimizes the mean out of fold deviance is
+        found and memorized.  Subsequently, the cross validation object can me 
+        scored and introspected, always using the optimal lambda we.
         '''
         self._check_if_unfit()
 
@@ -117,7 +122,7 @@ class CVGlmNet(object):
                                       include_full=self.include_full,
                                       weights=weights,
                                   )
-        # Get the appropriate fitter function
+        # Get the appropriate fitter function.
         fitter = fit_and_score_switch[self.base_estimator.__class__.__name__] 
         # Determine the sequence of lambda values to fit using cross validation.
         if lambdas is None:
@@ -127,9 +132,9 @@ class CVGlmNet(object):
                                   stop = np.log10(lmax),
                                   num = self.base_estimator.n_lambdas,
                       )[::-1]
-        # Fit in-fold glmnets in parallel.  For each such model, pass back the 
-        # series of lambdas fit and the out-of-fold deviances for each such 
-        # lambda.
+        # Fit in-fold glmnets in parallel.  For each such model, a tuple 
+        # containing the fitted model, and the models out-of-fold deviances 
+        # (one deviance per lambda).
         models_and_devs = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
                               delayed(fitter)(_clone(self.base_estimator), 
                                                      X, y,
@@ -139,40 +144,51 @@ class CVGlmNet(object):
                                                     )
                               for train_inds, valid_inds in self.fold_generator
                               )
-        # If the full model was fit by Parallel, then pull it off 
+        # If the full model was fit by Parallel, then pull it off of the 
+        # object returned from Parallel.
         if self.include_full:
             self.base_estimator = models_and_devs[0][0]
         # If the full model has not been fit yet, do it now.
         if not self.base_estimator._is_fit():
             self.base_estimator.fit(X, y, weights=weights, lambdas=lambdas, **kwargs)
-        # Unzip!
-        models, deviances = zip(*models_and_devs[1:])
-        # Determine the best lambdas, i.e. the value of lambda that minimizes
-        # the out of fold deviances
-        dev_stack = np.vstack(deviances)
-        oof_deviances = np.mean(dev_stack, axis=0)
-        # TODO: Implement std dev aware strat.
-        best_lambda_ind = np.argmin(oof_deviances)
-        best_lambda = lambdas[best_lambda_ind]
-        # Determine the standard deviation of deviances for each lambda, used
-        # for plotting method.
-        oof_stds = np.std(dev_stack, axis=0)
-        # Set attributes
-        self._oof_deviances = oof_deviances 
-        self._oof_stds = oof_stds
+            lambdas = self.base_estimator.out_lambdas
+        # Unzip and finish up!
+        self._models, self._all_deviances = zip(*models_and_devs[1:])
         self.lambdas = lambdas
-        self.best_lambda_ind = best_lambda_ind
-        self.best_lambda = best_lambda
+        self._fit = True
+
+    @property
+    def _oof_deviances(self):
+        dev_stack = np.vstack(self._all_deviances)
+        oof_deviances = np.mean(dev_stack, axis=0)
+        return oof_deviances 
+
+    @property
+    def _oof_stds(self):
+        dev_stack = np.vstack(self._all_deviances)
+        oof_stds = np.std(dev_stack, axis=0)
+        return oof_stds 
+        
+    @property
+    def best_lambda_idx(self):
+        self._check_if_fit()
+        best_lambda_idx = np.argmin(self._oof_deviances)
+        return best_lambda_idx
+
+    @property
+    def best_lambda(self):
+        self._check_if_fit()
+        return self.lambdas[self.best_lambda_idx]
 
     def predict(self, X):
         '''Score the optimal model given a model matrix.'''
         self._check_if_fit()
-        return self.base_estimator.predict(X)[:, self.best_lambda_ind].ravel()
+        return self.base_estimator.predict(X)[:, self.best_lambda_idx].ravel()
 
     def _describe_best_est(self):
         '''Describe the optimal model.'''
         self._check_if_fit()
-        return self.base_estimator.describe(lidx=self.best_lambda_ind)
+        return self.base_estimator.describe(lidx=self.best_lambda_idx)
 
     def _describe_cv(self):
         s = ("A glmnet model with optimal lambda determined by cross "
@@ -214,7 +230,7 @@ class CVGlmNet(object):
         plt.show()
 
     def _is_fit(self):
-        return hasattr(self, 'best_lambda')
+        return self._fit
 
     def _check_if_fit(self):
         if not self._is_fit():
