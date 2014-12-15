@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt 
 from fit_and_scorers import fit_and_score_switch
-from fold_generators import unweighted_k_fold, weighted_k_fold
+from fold_generators import KFold
 
 # Optional import: joblib.Parallel
 try: 
@@ -34,7 +34,7 @@ class CVGlmNet(object):
 
       This class provides a management scheme for glmnets that abstracts 
     away the process of determining an optimimal choice of the lambda 
-    parameter in a glmnet.  It:
+    parameter in a glmnet. It:
 
         * Provides a fit method that fits many glments over the same set of
           lambdas, but each on a random cross-fold of the training data
@@ -47,12 +47,13 @@ class CVGlmNet(object):
         * Calculate and visualize statistics pertaining to the cross validation 
           process.
     
-    Both weighted and unweighted training samples are provided, and the various
+    Both weighted and unweighted training samples are supported, and the various
     glmnet models can be fit in parallel.
     '''
 
     def __init__(self, glmnet, 
-                 n_folds=3, n_jobs=3, shuffle=True, verbose=2, cv_folds = None
+                 n_folds=3, n_jobs=3, include_full=False, 
+                 shuffle=True, verbose=2, cv_folds=None
         ):
         '''Create a cross validation glmnet object.  Accepts the following
         arguments:
@@ -75,24 +76,28 @@ class CVGlmNet(object):
           * verbose: 
               Amount of talkyness.
         '''
-
-        self.cv_folds = cv_folds
-
         if cv_folds:
+            self.fold_generator = cv_folds
             n_folds = cv_folds.n_folds
             shuffle = cv_folds.shuffle
-
+        else:
+            self.fold_generator = None
         if n_folds > 1 and par_avail == False:
-            raise ValueError("joblib.Parallel not available, must set n_folds "
-                             "== 1"
-                  )
+            raise ValueError(
+                "joblib.Parallel not available, must set n_folds == 1"
+            )
+        if include_full:
+            raise NotImplementedError(
+                "include_full is not yet supported during cross validation."
+            )
         self.base_estimator = glmnet
         self.n_folds = n_folds
         self.n_jobs = n_jobs
+        self.include_full = include_full
         self.shuffle = shuffle
         self.verbose = verbose
 
-    def fit(self, X, y, weights = None, lambdas = None, **kwargs):
+    def fit(self, X, y, weights=None, lambdas=None, **kwargs):
         '''Determine the optimal value of lambda by cross validation.
 
           This method fits n_fold glmnet objects, each for the same sequence 
@@ -104,19 +109,14 @@ class CVGlmNet(object):
         '''
         self._check_if_unfit()
 
-        cv_folds = self.cv_folds
-        if not cv_folds:
-            # Determine the indicies of the various train and test sets for the 
-            # cross validation.
-            if weights is not None:
-                cv_folds = weighted_k_fold(X.shape[0], n_folds=self.n_folds,
-                                                   shuffle=self.shuffle,
-                                                   weights=weights
-                       )
-            else:
-                cv_folds = unweighted_k_fold(X.shape[0], n_folds=self.n_folds, 
-                                                     shuffle=self.shuffle
-                       ) 
+        if not self.fold_generator:
+            self.fold_generator = KFold(
+                                      X.shape[0], 
+                                      n_folds=self.n_folds, 
+                                      shuffle=self.shuffle,
+                                      include_full=self.include_full,
+                                      weights=weights,
+                                  )
         # Copy the glmnet so we can fit the instance passed in as the final
         # model.
         base_estimator = _clone(self.base_estimator)
@@ -135,11 +135,11 @@ class CVGlmNet(object):
         deviances = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
                              delayed(fitter)(_clone(base_estimator), 
                                                     X, y,
-                                                    train_inds, test_inds,
+                                                    train_inds, valid_inds,
                                                     weights, lambdas,
                                                     **kwargs
                                                    )
-                             for train_inds, test_inds in cv_folds
+                             for train_inds, valid_inds in self.fold_generator
                              )
         # Determine the best lambdas, i.e. the value of lambda that minimizes
         # the out of fold deviances
