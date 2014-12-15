@@ -91,8 +91,8 @@ class KFold(object):
         for i in range(1, self.n_folds + 1):
             valid_interval = (cdf > cutoffs[i-1])*(cdf <= cutoffs[i])
             train_interval = 1 - valid_interval
-            valid_inds = list(samples[np.nonzero(valid_interval)])
-            train_inds = list(samples[np.nonzero(train_interval)])
+            valid_inds = samples[np.nonzero(valid_interval)]
+            train_inds = samples[np.nonzero(train_interval)]
             yield train_inds, valid_inds
 
     def _make_equal_weights(self):

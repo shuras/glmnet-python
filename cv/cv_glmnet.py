@@ -52,7 +52,7 @@ class CVGlmNet(object):
     '''
 
     def __init__(self, glmnet, 
-                 n_folds=3, n_jobs=3, include_full=False, 
+                 n_folds=3, n_jobs=3, include_full=True, 
                  shuffle=True, verbose=2, cv_folds=None
         ):
         '''Create a cross validation glmnet object.  Accepts the following
@@ -86,10 +86,10 @@ class CVGlmNet(object):
             raise ValueError(
                 "joblib.Parallel not available, must set n_folds == 1"
             )
-        if include_full:
-            raise NotImplementedError(
-                "include_full is not yet supported during cross validation."
-            )
+        #if include_full:
+        #    raise NotImplementedError(
+        #        "include_full is not yet supported during cross validation."
+        #    )
         self.base_estimator = glmnet
         self.n_folds = n_folds
         self.n_jobs = n_jobs
@@ -117,30 +117,36 @@ class CVGlmNet(object):
                                       include_full=self.include_full,
                                       weights=weights,
                                   )
-        # Copy the glmnet so we can fit the instance passed in as the final
-        # model.
-        base_estimator = _clone(self.base_estimator)
-        fitter = fit_and_score_switch[base_estimator.__class__.__name__] 
+        # Get the appropriate fitter function
+        fitter = fit_and_score_switch[self.base_estimator.__class__.__name__] 
         # Determine the sequence of lambda values to fit using cross validation.
         if lambdas is None:
-            lmax = base_estimator._max_lambda(X, y, weights=weights)
-            lmin = base_estimator.frac_lg_lambda * lmax  
+            lmax = self.base_estimator._max_lambda(X, y, weights=weights)
+            lmin = self.base_estimator.frac_lg_lambda * lmax  
             lambdas = np.logspace(start = np.log10(lmin),
                                   stop = np.log10(lmax),
-                                  num = base_estimator.n_lambdas,
+                                  num = self.base_estimator.n_lambdas,
                       )[::-1]
         # Fit in-fold glmnets in parallel.  For each such model, pass back the 
         # series of lambdas fit and the out-of-fold deviances for each such 
         # lambda.
-        deviances = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                             delayed(fitter)(_clone(base_estimator), 
-                                                    X, y,
-                                                    train_inds, valid_inds,
-                                                    weights, lambdas,
-                                                    **kwargs
-                                                   )
-                             for train_inds, valid_inds in self.fold_generator
-                             )
+        models_and_devs = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                              delayed(fitter)(_clone(self.base_estimator), 
+                                                     X, y,
+                                                     train_inds, valid_inds,
+                                                     weights, lambdas,
+                                                     **kwargs
+                                                    )
+                              for train_inds, valid_inds in self.fold_generator
+                              )
+        # If the full model was fit by Parallel, then pull it off 
+        if self.include_full:
+            self.base_estimator = models_and_devs[0][0]
+        # If the full model has not been fit yet, do it now.
+        if not self.base_estimator._is_fit():
+            self.base_estimator.fit(X, y, weights=weights, lambdas=lambdas, **kwargs)
+        # Unzip!
+        models, deviances = zip(*models_and_devs[1:])
         # Determine the best lambdas, i.e. the value of lambda that minimizes
         # the out of fold deviances
         dev_stack = np.vstack(deviances)
@@ -151,8 +157,6 @@ class CVGlmNet(object):
         # Determine the standard deviation of deviances for each lambda, used
         # for plotting method.
         oof_stds = np.std(dev_stack, axis=0)
-        # Refit a glmnet on the entire data set
-        self.base_estimator.fit(X, y, weights=weights, lambdas=lambdas, **kwargs)
         # Set attributes
         self._oof_deviances = oof_deviances 
         self._oof_stds = oof_stds

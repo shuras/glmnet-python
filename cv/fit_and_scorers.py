@@ -21,16 +21,26 @@ def fit_and_score_elastic_net(elastic_net, X, y,
                     weights=train_weights, lambdas=lambdas,
                     **kwargs
                 )
-    return elastic_net.deviance(X[valid_inds], y[valid_inds], 
-                                 weights=valid_weights
-                       )
+    if valid_inds.shape[0] != 0:
+        valid_dev = elastic_net.deviance(X[valid_inds], y[valid_inds], 
+                                         weights=valid_weights
+                        )
+    else:
+        valid_dev = None
+
+    return (elastic_net, valid_dev)
 
 def fit_and_score_logistic_net(logistic_net, X, y, 
                                train_inds, valid_inds,
                                weights, lambdas, 
                                **kwargs):
     logistic_net.fit(X[train_inds], y[train_inds], lambdas=lambdas, **kwargs)
-    return logistic_net.deviance(X[valid_inds], y[valid_inds])
+    if valid_inds.shape[0] != 0:
+        valid_dev = logistic_net.deviance(X[valid_inds], y[valid_inds])
+    else:
+        valid_dev = None
+
+    return (logistic_net, valid_dev)
 
 fit_and_score_switch = {'ElasticNet': fit_and_score_elastic_net,
                         'LogisticNet': fit_and_score_logistic_net
