@@ -360,10 +360,6 @@ class GlmNet(object):
         ax.set_ylabel("Parameter Value")
         plt.show()
 
-    def _clone(self):
-        '''Copy an unfit glmnet object.'''
-        return self.__class__(**self.__dict__)
-
     def _is_fit(self):
         '''The model has been fit successfully if and only if the _n_fit_obs
         attribute exists.
