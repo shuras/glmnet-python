@@ -1,30 +1,15 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt 
 from fit_and_scorers import fit_and_score_switch
 from fold_generators import KFold
 
-# Optional import: joblib.Parallel
-try: 
-    from sklearn.externals.joblib import Parallel, delayed 
-except ImportError: 
-    pass
-
-try: 
-    from joblib import Parallel, delayed
-except ImportError: 
-    pass
-
-try: 
-    Parallel() 
-except ne: 
-    par_avail = False 
-else: 
-    par_avail = True
+from ..util.importers import import_joblib, import_pyplot
+jl = import_joblib()
+plt = import_pyplot()
 
 
 def _clone(glmnet):
     '''Make a copy of an unfit glmnet object.'''
+    glmnet._check_if_unfit()
     return glmnet.__class__(**glmnet.__dict__)
 
 
@@ -52,7 +37,7 @@ class CVGlmNet(object):
     '''
 
     def __init__(self, glmnet, 
-                 n_folds=3, n_jobs=3, include_full=True, 
+                 n_folds=3, n_jobs=1, include_full=True, 
                  shuffle=True, cv_folds=None, verbose=1
         ):
         '''Create a cross validation glmnet object. Accepts the following
@@ -86,14 +71,10 @@ class CVGlmNet(object):
             shuffle = cv_folds.shuffle
         else:
             self.fold_generator = None
-        if n_folds > 1 and par_avail == False:
+        if n_jobs > 1 and not jl:
             raise ValueError(
-                "joblib.Parallel not available, must set n_folds == 1"
+                "joblib.Parallel not available, must set n_folds=1"
             )
-        #if include_full:
-        #    raise NotImplementedError(
-        #        "include_full is not yet supported during cross validation."
-        #    )
         self.base_estimator = glmnet
         self.n_folds = n_folds
         self.n_jobs = n_jobs
@@ -135,15 +116,28 @@ class CVGlmNet(object):
         # Fit in-fold glmnets in parallel.  For each such model, a tuple 
         # containing the fitted model, and the models out-of-fold deviances 
         # (one deviance per lambda).
-        models_and_devs = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                              delayed(fitter)(_clone(self.base_estimator), 
-                                                     X, y,
-                                                     train_inds, valid_inds,
-                                                     weights, lambdas,
-                                                     **kwargs
-                                                    )
-                              for train_inds, valid_inds in self.fold_generator
-                              )
+        if jl:
+            models_and_devs = (
+                jl.Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                    jl.delayed(fitter)(_clone(self.base_estimator), 
+                                    X, y,
+                                    train_inds, valid_inds,
+                                    weights, lambdas,
+                                    **kwargs
+                    )
+                    for train_inds, valid_inds in self.fold_generator
+                )
+            )
+        else:
+            models_and_devs = ([
+                fitter(_clone(self.base_estimator),
+                       X, y,
+                       train_inds, valid_inds,
+                       weights, lambdas,
+                       **kwargs
+                )
+                for train_inds, valid_inds in self.fold_generator
+            ])
         # If the full model was fit by Parallel, then pull it off of the 
         # object returned from Parallel.
         if self.include_full:
@@ -213,6 +207,9 @@ class CVGlmNet(object):
         across folds.
         '''
         self._check_if_fit()
+        if not plt:
+            raise RuntimeError('pyplot unavailable.')
+
         plt.clf()
         fig, ax = plt.subplots()
         xvals = np.log(self.lambdas)

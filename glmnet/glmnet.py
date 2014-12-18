@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.sparse import issparse, isspmatrix_csc
-import matplotlib
-import matplotlib.pyplot as plt 
 from glmnet_config import (_DEFAULT_THRESH,
                            _DEFAULT_FLMIN,
                            _DEFAULT_NLAM)
 from warnings import warn
+
+from ..util.importers import import_pyplot
+plt = import_pyplot()
+
 
 class GlmNet(object):
     '''Parent class for glmnet model objects.
@@ -349,6 +351,9 @@ class GlmNet(object):
         at each value of log(\lambda).
         '''
         self._check_if_fit()
+        if not plt:
+            raise RuntimeError('pyplot unavailable.')
+
         plt.clf()
         fig, ax = plt.subplots()
         xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
