@@ -18,7 +18,7 @@ config.add_extension(name='_glmnet',
 )
 
 config_dict = config.todict()
-
+del config_dict['package_dir']
 if __name__ == '__main__':
     from numpy.distutils.core import setup
     setup(version='0.9',
@@ -28,7 +28,6 @@ if __name__ == '__main__':
           url='github.com/madrury/glmnet-python',
           license='GPL2',
           requires=['NumPy (>= 1.3)'],
-          packages=['glmnet'],
           **config_dict
 )
 
