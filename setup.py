@@ -28,6 +28,7 @@ if __name__ == '__main__':
           url='github.com/madrury/glmnet-python',
           license='GPL2',
           requires=['NumPy (>= 1.3)'],
+          packages=['glmnet'],
           **config_dict
 )
 
