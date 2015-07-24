@@ -1190,25 +1190,27 @@ python module _glmnet ! in
             integer dimension(*) :: jd
             real*8 dimension(ni),depend(ni) :: vp
             real*8 dimension(2,ni),depend(ni) :: cl
-            integer :: ne
-            integer, optional,check(shape(ca,0)==nx),depend(ca) :: nx=shape(ca,0)
-            integer, optional,check(len(ulam)>=nlam),depend(ulam) :: nlam=len(ulam)
+            integer optional,depend(x) :: ne=min(shape(x,1), nx)
+            integer :: nx
+            integer, optional,check((flmin < 1.0 || len(ulam)>=nlam)),depend(flmin,ulam) :: nlam=len(ulam)
             real*8 :: flmin
             real*8 dimension(nlam) :: ulam
             real*8 :: thr
-            integer :: isd
-            integer :: jsd
-            integer :: intr
-            integer :: maxit
-            integer :: lmu
-            real*8 dimension(nr,nlam),depend(nr,nlam) :: a0
-            real*8 dimension(nx,nr,nlam),depend(nr,nlam) :: ca
-            integer dimension(nx),depend(nx) :: ia
-            integer dimension(nlam),depend(nlam) :: nin
-            real*8 dimension(nlam),depend(nlam) :: rsq
-            real*8 dimension(nlam),depend(nlam) :: alm
-            integer :: nlp
-            integer :: jerr
+            integer optional :: isd=1 ! Standardize predictors by default
+            integer optional :: jsd=1 ! Standardize responses by default
+            integer optional :: intr=1 ! Include intercept by default
+            integer optional :: maxit=100000 ! Maximum iterations
+
+            ! Outputs
+            integer intent(out) :: lmu
+            real*8 intent(out),dimension(nr,nlam),depend(nr,nlam) :: a0
+            real*8 intent(out),dimension(nx,nr,nlam),depend(nr,nlam) :: ca
+            integer intent(out),dimension(nx),depend(nx) :: ia
+            integer intent(out),dimension(nlam),depend(nlam) :: nin
+            real*8 intent(out),dimension(nlam),depend(nlam) :: rsq
+            real*8 intent(out),dimension(nlam),depend(nlam) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
         end subroutine multelnet
         subroutine multelnetn(parm,no,ni,nr,x,y,w,jd,vp,cl,ne,nx,nlam,flmin,ulam,thr,isd,jsd,intr,maxit,lmu,a0,ca,ia,nin,rsq,alm,nlp,jerr) ! in :glmnet5:glmnet5.f
             real*8 :: parm
@@ -1362,8 +1364,8 @@ python module _glmnet ! in
         end subroutine multmodval
         subroutine multspelnet(parm,no,ni,nr,x,ix,jx,y,w,jd,vp,cl,ne,nx,nlam,flmin,ulam,thr,isd,jsd,intr,maxit,lmu,a0,ca,ia,nin,rsq,alm,nlp,jerr) ! in :glmnet5:glmnet5.f
             real*8 :: parm
-            integer, optional,check(shape(y,0)==no),depend(y) :: no=shape(y,0)
-            integer, optional,check(len(vp)>=ni),depend(vp) :: ni=len(vp)
+            integer, optional,check(shape(x,0)==no),depend(x) :: no=shape(x,0)
+            integer, optional,check(shape(x,1)==ni),depend(x) :: ni=shape(x,1)
             integer, optional,check(shape(y,1)==nr),depend(y) :: nr=shape(y,1)
             real*8 dimension(*) :: x
             integer dimension(*) :: ix
@@ -1379,19 +1381,21 @@ python module _glmnet ! in
             real*8 :: flmin
             real*8 dimension(nlam) :: ulam
             real*8 :: thr
-            integer :: isd
-            integer :: jsd
-            integer :: intr
-            integer :: maxit
-            integer :: lmu
-            real*8 dimension(nr,nlam),depend(nr,nlam) :: a0
-            real*8 dimension(nx,nr,nlam),depend(nr,nlam) :: ca
-            integer dimension(nx),depend(nx) :: ia
-            integer dimension(nlam),depend(nlam) :: nin
-            real*8 dimension(nlam),depend(nlam) :: rsq
-            real*8 dimension(nlam),depend(nlam) :: alm
-            integer :: nlp
-            integer :: jerr
+            integer optional :: isd=1 ! Standardize precictors by default
+            integer optional :: jsd=1 ! Standardize responses by default
+            integer optional :: intr=1 ! Include intercept by default
+            integer optional :: maxit=100000 ! Maximum iterations
+
+            !Outputs
+            integer intent(out) :: lmu
+            real*8 intent(out),dimension(nr,nlam),depend(nr,nlam) :: a0
+            real*8 intent(out),dimension(nx,nr,nlam),depend(nr,nlam) :: ca
+            integer intent(out),dimension(nx),depend(nx) :: ia
+            integer intent(out),dimension(nlam),depend(nlam) :: nin
+            real*8 intent(out),dimension(nlam),depend(nlam) :: rsq
+            real*8 intent(out),dimension(nlam),depend(nlam) :: alm
+            integer intent(out):: nlp
+            integer intent(out):: jerr
         end subroutine multspelnet
         subroutine multspelnetn(parm,no,ni,nr,x,ix,jx,y,w,jd,vp,cl,ne,nx,nlam,flmin,ulam,thr,isd,jsd,intr,maxit,lmu,a0,ca,ia,nin,rsq,alm,nlp,jerr) ! in :glmnet5:glmnet5.f
             real*8 :: parm
