@@ -54,7 +54,7 @@ class ElasticNet(GlmNet):
               model fitting.  If no array is passed, all covaraites in X are 
               included in the model.
           * box_constraints: 
-              An array with dimension 2 * n_obs. Interval constraints on the fit
+              An array with dimension 2 * n_preds. Interval constraints on the fit
               coefficients.  The (0, i) entry is a lower bound on the ith
               covariate, and the (1, i) entry is an upper bound.  These must 
               satisfy lower_bound <= 0 <= upper_bound.  If no array is passed,
@@ -130,7 +130,7 @@ class ElasticNet(GlmNet):
         # Make a copy if we are not able to overwrite X with its standardized 
         # version. Note that if X is not fortran contiguous, then it will be 
         # copied anyway.
-        if not issparse(X) and np.isfortran(X) and not self.overwrite_pred_ok:
+        if not issparse(X) and not (np.isfortran(X) and self.overwrite_pred_ok):
             X = X.copy(order='F')
         # Make a copy if we are not able to overwrite y with its standardized
         # version.
