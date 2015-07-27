@@ -3,6 +3,8 @@ from scipy.sparse import issparse
 import _glmnet
 from glmnet import GlmNet
 
+plt = import_pyplot()
+
 class MultiElasticNet(GlmNet):
     '''Multiresponse elastic net: a multivariate linear model with both L1 and L2
     regularizers.
@@ -213,37 +215,86 @@ class MultiElasticNet(GlmNet):
         self._check_if_fit()
         return self._comp_coef[:np.max(self._n_comp_coef),:,:self._out_n_lambdas]
 
-    def deviance(self, X, y, weights = None):
+    @GlmNet.intercepts.getter
+    def intercepts(self):
+        '''The fit model intercepts, one for each response for each value of lambda (n_resps x n_lambdas).'''
+        self._check_if_fit()
+        return self._intercepts[:, :self._out_n_lambdas]
+
+    def deviance(self, X, y, weights=None):
         '''Calculate the normal deviance (i.e. sum of squared errors) for
         every lambda.  The model must already be fit to call this method.
         '''
         self._check_if_fit()
         if weights is not None and weights.shape[0] != X.shape[0]:
-            raise ValueError("The weights vector must have the same length "
-                             "as X."
-                  )
+            raise ValueError("The weights vector must have the same length as X.")
+
+        # We normalise responses by default
+        resp_weights = 1.0 / np.apply_along_axis(np.nanstd, 0, np.array(y))
+
         y_hat = self.predict(X)
-        # Take the response y, and repeat it as a column to produce a matrix
+        # Take the response y, and repeat it to produce a matrix
         # of the same dimensions as y_hat
-        y_stacked = np.tile(np.array([y]).transpose(), y_hat.shape[1])
+        a = np.array(y)
+        y_stacked = np.tile(a.reshape(a.shape + (1,)), (1, 1, y_hat.shape[-1]))
+        rw_stacked = np.tile(resp_weights.reshape(1, len(resp_weights), 1), (y_hat.shape[0], 1, y_hat.shape[2]))
         if weights is None:
-            sq_residuals = (y_stacked - y_hat)**2
-            normfac = X.shape[0]
+            sq_residuals = ((y_stacked - y_hat) * rw_stacked)**2
+            normfac = X.shape[0] * y.shape[1]
         else:
-            w_stacked = np.tile(np.array([weights]).transpose(),
-                                y_hat.shape[1]
-                        )
-            sq_residuals = w_stacked * (y_stacked - y_hat)**2
-            normfac = np.sum(weights)
-        return np.apply_along_axis(np.sum, 0, sq_residuals) / normfac
+            w = np.array(weights)
+            w_stacked = np.tile(w.reshape((y_hat.shape[0], 1, 1)), (1,) + y_hat.shape[1:])
+            sq_residuals = w_stacked * ((y_stacked - y_hat) * rw_stacked)**2
+            normfac = np.sum(weights) * y.shape[1]
+        return np.apply_over_axes(np.sum, sq_residuals, [0, 1]).ravel() / normfac
 
     def predict(self, X):
-        '''Produce model predictions from new data.'''
-        return self._predict_lp(X)
+        '''Produce model predictions from new data.
+           Returns an n_obs * n_rets * n_lambdas array, where n_obs is the number of rows in X.
+        '''
+        self._check_if_fit()
+        dot = self._get_dot(X)
+        if np.max(self._n_comp_coef) > 0 :
+            c = np.swapaxes(self._coefficients, 0, 1)
+            return self.intercepts + dot(X[:, self._indices], c)
+        else:
+            return np.tile(self.intercepts, (X.shape[0], 1, 1))
 
-    def plot_paths(self):
-        '''Plot parameter estiamte paths by log(lambda).'''
-        self._plot_path('multi-response elastic')
+    def predict_for_lambda_index(self, X, lambda_ix):
+        '''Produce model predictions from new data for a given index of lambda.
+           Returns an n_obs * n_rets array, where n_obs is the number of rows in X.
+        '''
+        self._check_if_fit()
+        dot = self._get_dot(X)
+        if np.max(self._n_comp_coef) > 0 :
+            c = self._coefficients[:, :, lambda_ix]
+            return self.intercepts[:, lambda_ix] + dot(X[:, self._indices], c)
+        else:
+            return np.tile(self.intercepts[:, lambda_ix], (X.shape[0], 1))
+
+    def plot_path(self):
+        '''Plot the full regularization path of all the non-zero model
+        coefficients.  Creates an displays a plot of the parameter estimates
+        at each value of log(\lambda).
+        Betas for different response variables corresponding to every predictor are aggregated using L2 norm.
+        '''
+        self._check_if_fit()
+        if not plt:
+            raise RuntimeError('pyplot unavailable.')
+
+        plt.clf()
+        fig, ax = plt.subplots()
+        xvals = np.log(self.out_lambdas[1:self._out_n_lambdas])
+        def l2(x):
+            return np.sqrt(np.sum(x * x))
+        for coef_path in self._coefficients:
+            ax.plot(xvals, np.apply_along_axis(l2, 0, coef_path[:, 1:]))
+        ax.set_title("Regularization paths for multi-response elastic net with alpha = %s" %
+                     (self.alpha))
+        ax.set_xlabel("log(lambda)")
+        ax.set_ylabel("Parameter Value")
+        plt.show()
+
 
     def __str__(self):
         return self._str('multi-response elastic')
