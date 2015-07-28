@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import issparse
 import _glmnet
-from glmnet import GlmNet
+from glmnet import GlmNet, import_pyplot
 
 plt = import_pyplot()
 

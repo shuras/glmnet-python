@@ -43,5 +43,6 @@ def fit_and_score_logistic_net(logistic_net, X, y,
     return (logistic_net, valid_dev)
 
 fit_and_score_switch = {'ElasticNet': fit_and_score_elastic_net,
-                        'LogisticNet': fit_and_score_logistic_net
+                        'LogisticNet': fit_and_score_logistic_net,
+                        'MultiElasticNet': fit_and_score_elastic_net
                        }
