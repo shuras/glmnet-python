@@ -18,7 +18,7 @@ config.add_extension(name='_glmnet',
 )
 
 config_dict = config.todict()
-
+config_dict['packages'].extend(['glmnet.glmnet', 'glmnet.util', 'glmnet.cv'])
 if __name__ == '__main__':
     from numpy.distutils.core import setup
     setup(version='0.9',

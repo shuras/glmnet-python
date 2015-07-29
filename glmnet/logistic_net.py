@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import issparse
-import _glmnet
+from glmnet import _glmnet
 from glmnet import GlmNet
 
 class LogisticNet(GlmNet):

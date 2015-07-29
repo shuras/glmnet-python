@@ -5,7 +5,7 @@ from glmnet_config import (_DEFAULT_THRESH,
                            _DEFAULT_NLAM)
 from warnings import warn
 
-from ..util.importers import import_pyplot
+from glmnet.util.importers import import_pyplot
 plt = import_pyplot()
 
 
