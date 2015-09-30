@@ -1,7 +1,9 @@
+from __future__ import absolute_import
+
 import numpy as np
 from scipy.sparse import issparse
-import _glmnet
-from glmnet import GlmNet, import_pyplot
+from glmnet import _glmnet
+from glmnet.glmnet import GlmNet, import_pyplot
 
 plt = import_pyplot()
 

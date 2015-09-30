@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 import numpy as np
 from scipy.sparse import issparse, isspmatrix_csc
-from glmnet_config import (_DEFAULT_THRESH,
-                           _DEFAULT_FLMIN,
-                           _DEFAULT_NLAM)
+from glmnet.glmnet_config import (_DEFAULT_THRESH,
+                                  _DEFAULT_FLMIN,
+                                  _DEFAULT_NLAM)
 from warnings import warn
 
 from glmnet.util.importers import import_pyplot

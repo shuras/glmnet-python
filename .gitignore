@@ -1,3 +1,7 @@
 build/
+glmnet.egg-info/
 *.pyc
-
+*.so
+*iml
+*.c
+*-f2pywrappers.f

@@ -1,7 +1,8 @@
+from __future__ import absolute_import
 import numpy as np
 from scipy.sparse import issparse
 from glmnet import _glmnet
-from glmnet import GlmNet
+from glmnet.glmnet import GlmNet
 
 class ElasticNet(GlmNet):
     '''The elastic net: a multivariate linear model with both L1 and L2
