@@ -1,8 +1,10 @@
-import numpy as np
-from fit_and_scorers import fit_and_score_switch
-from fold_generators import KFold
+from __future__ import absolute_import
 
-from ..util.importers import import_joblib, import_pyplot
+import numpy as np
+from glmnet.cv.fit_and_scorers import fit_and_score_switch
+from glmnet.cv.fold_generators import KFold
+
+from glmnet.util.importers import import_joblib, import_pyplot
 jl = import_joblib()
 plt = import_pyplot()
 
